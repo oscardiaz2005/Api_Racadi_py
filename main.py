@@ -1,4 +1,4 @@
-from fastapi import FastAPI ,HTTPException,Depends
+from fastapi import FastAPI ,HTTPException,Depends,status
 from conexion import crear,get_db
 from modelo import *
 from sqlalchemy.orm import Session 
@@ -7,6 +7,11 @@ from schemas import *
 import bcrypt
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import text
+#si no les agarra descarguen esto 'pip install fastapi uvicorn python-jose[cryptography] passlib'
+from jose import JWTError,jwt
+from datetime import datetime,timedelta
+from passlib.context import CryptContext
+from fastapi.security import OAuth2PasswordBearer
 
 
 app=FastAPI()
@@ -26,6 +31,20 @@ app.add_middleware(
 #CREAR LAS TABLAS
 base.metadata.create_all(bind=crear)
 
+#CONFIGURACION PARA LOS TOKENS
+SECRET_KEY="racadiacademyadso"
+ALGORITMO = "HS256" 
+MINUTOS_DE_EXPIRACION = 30
+
+## Encriptacion de contraseñas
+encriptacion = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Función para verificar la contraseña
+def verificar_contraseña_login(contraseña, hashed_contraseña):
+    return encriptacion.verify(contraseña, hashed_contraseña)
+
+# Función para obtener el hash de una contraseña
+def encriptar_contraseña(password):
+    return encriptacion.hash(password)
 
 
 #FUNCION PARA VALIDAR CONTRASEÑAS
@@ -73,6 +92,302 @@ def usuario_existe_globalmente(usuario: str, db: Session):
     
     # Si no se encuentra en ninguna tabla, entonces no existe xd ajsj , se devuelve false
     return False
+
+
+#FUNCION PARA OBTENER DATOS DE UN USUARIO
+def obtener_datos_usuario(usuario: str, db: Session):
+    # Verificar en la tabla de Administradores
+    existe_en_admin = db.query(Administrador).filter(Administrador.usuario == usuario).first()
+    if existe_en_admin:
+        return existe_en_admin
+    
+    # Verificar en la tabla de Estudiantes
+    existe_en_estudiante = db.query(Estudiante).filter(Estudiante.usuario == usuario).first()
+    if existe_en_estudiante:
+        return existe_en_estudiante
+    
+    # Verificar en la tabla de Profesores
+    existe_en_profesor = db.query(Profesor).filter(Profesor.usuario == usuario).first()
+    if existe_en_profesor:
+        return existe_en_profesor
+    
+    # Si no se encuentra en ninguna tabla, entonces no existe xd ajsj , se devuelve none
+    return None
+
+
+#funcion para validar usuario
+def autenticar_usuario(db : Session , usuario: str, contraseña: str):
+    usuario = obtener_datos_usuario(db, usuario)
+    if not usuario:
+        return False
+    if not verificar_contraseña(contraseña, usuario["contraseña"]):
+        return False
+    return usuario
+
+
+
+#CREAR TOKEN
+def crear_token(datos: dict, tiempo_expiracion: timedelta = None):
+    dato_codificado = datos.copy()
+    if tiempo_expiracion:
+        expiracion = datetime.utcnow() + tiempo_expiracion
+    else:
+        expiracion = datetime.utcnow() + timedelta(minutes=15)
+
+    dato_codificado.update({"exp": expiracion})
+    jwt_token = jwt.encode(dato_codificado, SECRET_KEY, algorithm=ALGORITMO)
+    return jwt_token
+
+
+
+
+# METODO DE LOGIN 
+@app.post("/login", response_model=dict)
+async def login(datos_login: LoginBase, db: Session = Depends(get_db)):
+    # Obtener los datos del usuario (puede ser Administrador, Estudiante o Profesor)
+    usuario = obtener_datos_usuario(datos_login.usuario, db)
+    
+    # Si no se encuentra el usuario en ninguna tabla
+    if not usuario:
+        raise HTTPException(status_code=400, detail="Usuario incorrecto")
+    
+    # Verificar la contraseña
+    if not verificar_contraseña_login(datos_login.contraseña, usuario.contraseña):
+        raise HTTPException(status_code=400, detail="Contraseña incorrecta")
+    
+    # Crear los datos del token
+    datos_token = {}
+
+
+    #  crear datos de usuario según el rol 
+    if isinstance(usuario, Administrador):
+        datos_token= {
+            "rol": "administrador",
+                "administrador_id": usuario.administrador_id,
+                "correo": usuario.correo,
+                "usuario": usuario.usuario
+            
+        }
+    
+    if isinstance(usuario, Estudiante):
+        datos_token = {
+            "rol": "estudiante",
+                "documento": usuario.documento,
+                "tipo_de_documento": usuario.tipo_de_documento,
+                "nombre": usuario.nombre,
+                "apellido": usuario.apellido,
+                "celular": usuario.celular,
+                "correo": usuario.correo,
+                "usuario": usuario.usuario,
+                "sede": usuario.sede
+            }
+        
+
+    if isinstance(usuario, Profesor):
+        datos_token =  {
+            "rol": "profesor",
+                "documento": usuario.documento,
+                "tipo_de_documento": usuario.tipo_de_documento,
+                "nombre": usuario.nombre,
+                "apellido": usuario.apellido,
+                "celular": usuario.celular,
+                "correo": usuario.correo,
+                "usuario": usuario.usuario
+            }
+
+     # Generar el token JWT con la función creada previamente
+    token_acceso = crear_token(datos=datos_token, tiempo_expiracion=timedelta(minutes=MINUTOS_DE_EXPIRACION))
+    return {"access_token": token_acceso, "token_type": "bearer"}
+
+
+
+
+# El URL del login para la obtención del token
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
+# Excepción de credenciales inválidas
+credentials_exception = HTTPException(
+    status_code=status.HTTP_401_UNAUTHORIZED,
+    detail="No se pudo validar el token",
+    headers={"WWW-Authenticate": "Bearer"},
+)
+
+# Función para obtener el usuario actual basado en el token
+async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    try:
+       
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITMO])
+        
+        # Obtener el nombre de usuario (u otro identificador) desde el token
+        usuario: str = payload.get("usuario")
+        if usuario is None:
+            raise credentials_exception
+        
+    except JWTError:
+        # Si hay un error en el token o ha expirado
+        raise credentials_exception
+
+    # Obtener los datos del usuario desde la base de datos
+    user = obtener_datos_usuario(usuario, db)
+    if user is None:
+        raise credentials_exception
+    
+    return user
+
+# Endpoint protegido para obtener el usuario actual
+@app.get("/users/me")
+async def read_users_me(current_user: dict = Depends(get_current_user)):
+    if current_user.__class__.__name__.lower()=="administrador":
+        return {
+                "rol": "administrador",
+                "administrador_id": current_user.administrador_id,
+                "correo": current_user.correo,
+                "usuario": current_user.usuario
+        }
+    elif current_user.__class__.__name__.lower()=="estudiante":
+        return{
+                 "rol": "estudiante",
+                "documento": current_user.documento,
+                "tipo_de_documento": current_user.tipo_de_documento,
+                "nombre": current_user.nombre,
+                "apellido": current_user.apellido,
+                "celular": current_user.celular,
+                "correo": current_user.correo,
+                "usuario": current_user.usuario,
+                "sede": current_user.sede
+        }   
+    elif current_user.__class__.__name__.lower()=="profesor":
+        return{
+                 "rol": "profesor",
+                "documento": current_user.documento,
+                "tipo_de_documento": current_user.tipo_de_documento,
+                "nombre": current_user.nombre,
+                "apellido": current_user.apellido,
+                "celular": current_user.celular,
+                "correo": current_user.correo,
+                "usuario": current_user.usuario,
+        }          
+ 
+            
+
+
+   
+
+
+   
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -175,71 +490,6 @@ async def añadir_profesor(datos_profesor:ProfesorBase, db: Session =Depends(get
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Algo salió mal: {str(e)}")
     
-
-
-#METODO DE LOGIN 
-@app.post("/login")
-async def login(datos_login: LoginBase, db: Session = Depends(get_db)):
-    # Verificar si el usuario existe en Administradores
-    usuario_admin = db.query(Administrador).filter(Administrador.usuario == datos_login.usuario).first()
-    if usuario_admin:
-        if bcrypt.checkpw(datos_login.contraseña.encode('utf-8'), usuario_admin.contraseña.encode('utf-8')):
-            return {"rol": "administrador",
-                    "datos_admin":{
-                        "administrador_id":usuario_admin.administrador_id,
-                        "correo":usuario_admin.correo,
-                        "usuario":usuario_admin.usuario,
-                        "contraseña":usuario_admin.contraseña
-                    }}
-        else:
-            raise HTTPException(status_code=400, detail="Contraseña incorrecta")
-
-    # Verificar si el usuario existe en Estudiantes
-    usuario_estudiante = db.query(Estudiante).filter(Estudiante.usuario == datos_login.usuario).first()
-    if usuario_estudiante:
-        if bcrypt.checkpw(datos_login.contraseña.encode('utf-8'), usuario_estudiante.contraseña.encode('utf-8')):
-            return {
-            "rol": "estudiante",
-            "datos_estudiante": {
-                "documento": usuario_estudiante.documento,
-                "tipo_de_documento": usuario_estudiante.tipo_de_documento,
-                "nombre": usuario_estudiante.nombre,
-                "apellido": usuario_estudiante.apellido,
-                "celular": usuario_estudiante.celular,
-                "correo": usuario_estudiante.correo,
-                "usuario":usuario_estudiante.usuario,
-                "contraseña":usuario_estudiante.contraseña,
-                "sede": usuario_estudiante.sede,
-            }
-        }
-        else:
-            raise HTTPException(status_code=400, detail="Contraseña incorrecta")
-
-    # Verificar si el usuario existe en Profesores
-    usuario_profesor = db.query(Profesor).filter(Profesor.usuario == datos_login.usuario).first()
-    if usuario_profesor:
-        if bcrypt.checkpw(datos_login.contraseña.encode('utf-8'), usuario_profesor.contraseña.encode('utf-8')):
-            return {
-                    "rol": "profesor",
-                    "datos_profesor": {
-                        "documento": usuario_profesor.documento,
-                        "tipo_de_documento": usuario_profesor.tipo_de_documento,
-                        "nombre": usuario_profesor.nombre,
-                        "apellido": usuario_profesor.apellido,
-                        "celular": usuario_profesor.celular,
-                        "correo": usuario_profesor.correo,
-                        "usuario":usuario_profesor.usuario,
-                        "contraseña":usuario_profesor.contraseña                      
-                    }
-                }            
-
-        else:
-            raise HTTPException(status_code=400, detail="Contraseña incorrecta")
-
-    # Si no se encuentra el usuario en ninguna tabla
-    raise HTTPException(status_code=400, detail="Usuario incorrecto")
-
-
 
 ## METODO PARA CONSULTAR TODOS LOS ESTUDIANTES
 @app.get("/obtenerestudiantes")
