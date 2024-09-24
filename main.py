@@ -10,15 +10,18 @@ from sqlalchemy import text
 #si no les agarra descarguen esto 'pip install fastapi uvicorn python-jose[cryptography] passlib'
 from jose import JWTError,jwt
 from datetime import datetime,timedelta
-from passlib.context import CryptContext
 from fastapi.security import OAuth2PasswordBearer
 from funciones import *
 
+
 # DOCUMENTEN EL CODIGO (COMENTAR) PARA QUE NO SE HAGA UN SANCOCHO XFA
+
+
+#inicializar la app
 app=FastAPI()
 
+
 #PERMITIR EL USO DE LA API
-app=FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],  
@@ -32,9 +35,14 @@ base.metadata.create_all(bind=crear)
 
 
 
+#-------------------------------------------------------------------------------------------------------------------------            
+#-------------------------------------------------------------------------------------------------------------------------            
+#-------------------------------------------------------------------------------------------------------------------------            
 
 
 # METODO DE LOGIN 
+
+
 @app.post("/login", response_model=dict)
 async def login(datos_login: LoginBase, db: Session = Depends(get_db)):
     # Obtener los datos del usuario (puede ser Administrador, Estudiante o Profesor)
@@ -61,7 +69,6 @@ async def login(datos_login: LoginBase, db: Session = Depends(get_db)):
                 "usuario": usuario.usuario
             
         }
-    
     if isinstance(usuario, Estudiante):
         datos_token = {
             "rol": "estudiante",
@@ -74,8 +81,6 @@ async def login(datos_login: LoginBase, db: Session = Depends(get_db)):
                 "usuario": usuario.usuario,
                 "sede": usuario.sede
             }
-        
-
     if isinstance(usuario, Profesor):
         datos_token =  {
             "rol": "profesor",
@@ -88,10 +93,9 @@ async def login(datos_login: LoginBase, db: Session = Depends(get_db)):
                 "usuario": usuario.usuario
             }
 
-     # Generar el token JWT con la función creada previamente
+     # Generar el token JWT 
     token_acceso = crear_token(datos=datos_token, tiempo_expiracion=timedelta(minutes=MINUTOS_DE_EXPIRACION))
     return {"access_token": token_acceso, "token_type": "bearer"}
-
 
 
 
@@ -108,10 +112,8 @@ credentials_exception = HTTPException(
 # Función para obtener el usuario actual basado en el token
 async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     try:
-       
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITMO])
-        
-        # Obtener el nombre de usuario (u otro identificador) desde el token
+        # Obtener el nombre de usuario  desde el token
         usuario: str = payload.get("usuario")
         if usuario is None:
             raise credentials_exception
@@ -161,132 +163,14 @@ async def read_users_me(current_user: dict = Depends(get_current_user)):
                 "usuario": current_user.usuario,
         }          
  
-            
 
 
-   
+#-------------------------------------------------------------------------------------------------------------------------            
+#-------------------------------------------------------------------------------------------------------------------------            
+#-------------------------------------------------------------------------------------------------------------------------            
 
 
-   
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#METODOS DE AGREGAR (post)
 
 
 #METODO PARA AGREGAR ADMINISTRADORES
@@ -324,6 +208,7 @@ async def add_admin(datos_administador:AdministradorBase , db: Session =Depends(
 
 
 
+
 #METODO PARA AÑADIR ESTUDIANTES
 @app.post("/añadirestudiante")
 async def añadir_estudiante(datos_estudiante:EstudianteBase, db: Session =Depends(get_db)):
@@ -355,6 +240,7 @@ async def añadir_estudiante(datos_estudiante:EstudianteBase, db: Session =Depen
     
 
 
+
 #METODO PARA AÑADIR PROFESORES
 @app.post("/añadirprofesor")
 async def añadir_profesor(datos_profesor:ProfesorBase, db: Session =Depends(get_db)):
@@ -383,6 +269,25 @@ async def añadir_profesor(datos_profesor:ProfesorBase, db: Session =Depends(get
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Algo salió mal: {str(e)}")
     
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+##aca iran metodos delete put y get
+
+
+
 
 ## METODO PARA CONSULTAR TODOS LOS ESTUDIANTES
 @app.get("/obtenerestudiantes")

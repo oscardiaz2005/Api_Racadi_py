@@ -1,16 +1,10 @@
-from fastapi import FastAPI ,HTTPException,Depends,status
-from conexion import crear,get_db
 from modelo import *
 from sqlalchemy.orm import Session 
-from fastapi.middleware.cors import CORSMiddleware
 from schemas import *
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import text
 #si no les agarra descarguen esto 'pip install fastapi uvicorn python-jose[cryptography] passlib'
-from jose import JWTError,jwt
+from jose import jwt
 from datetime import datetime,timedelta
 from passlib.context import CryptContext
-from fastapi.security import OAuth2PasswordBearer
 
 
 
@@ -19,15 +13,16 @@ SECRET_KEY="racadiacademyadso"
 ALGORITMO = "HS256" 
 MINUTOS_DE_EXPIRACION = 30
 
+
 ## Encriptacion de contraseñas
 encriptacion = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # Función para verificar la contraseña
 def verificar_contraseña_login(contraseña, hashed_contraseña):
     return encriptacion.verify(contraseña, hashed_contraseña)
-
 # Función para obtener el hash de una contraseña
 def encriptar_contraseña(password):
     return encriptacion.hash(password)
+
 
 
 #FUNCION PARA VALIDAR CONTRASEÑAS
@@ -98,6 +93,7 @@ def obtener_datos_usuario(usuario: str, db: Session):
     return None
 
 
+
 #funcion para validar usuario
 def autenticar_usuario(db : Session , usuario: str, contraseña: str):
     usuario = obtener_datos_usuario(db, usuario)
@@ -106,8 +102,6 @@ def autenticar_usuario(db : Session , usuario: str, contraseña: str):
     if not verificar_contraseña(contraseña, usuario["contraseña"]):
         return False
     return usuario
-
-
 
 #CREAR TOKEN
 def crear_token(datos: dict, tiempo_expiracion: timedelta = None):

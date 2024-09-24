@@ -29,7 +29,7 @@ class EstudianteBase(BaseModel):
     correo: str
     usuario: str
     contraseña: str
-    sede: Literal['madrid', 'mosquera', 'funza', 'faca', 'bogota']
+    sede: Literal['madrid', 'mosquera', 'funza', 'facatativa', 'bogota']
 
 class NivelBase(BaseModel):
     nombre_nivel: str
