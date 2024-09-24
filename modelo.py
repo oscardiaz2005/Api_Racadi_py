@@ -33,7 +33,7 @@ class Estudiante(base):
     correo = Column(String(30), nullable=False)
     usuario = Column(String(30), nullable=False)
     contraseña = Column(String(60), nullable=False)
-    sede = Column(Enum('madrid', 'mosquera', 'funza', 'faca', 'bogota'), nullable=False)
+    sede = Column(Enum('madrid', 'mosquera', 'funza', 'facatativa', 'bogota'), nullable=False)
 
 class Nivel(base):
     __tablename__ = 'niveles'
