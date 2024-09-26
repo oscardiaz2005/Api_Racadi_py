@@ -318,6 +318,27 @@ async def añadir_plan(datos_nivel:NivelBase,db:Session=Depends(get_db)):
 
 
 
+#METODO PARA AÑADIR CLASES
+@app.post("/añadirclase")
+async def añadir_clase(datos_clase:ClaseBase,db:Session=Depends(get_db)):
+    nueva_clase=Clase(
+      sede= datos_clase.sede,nivel = datos_clase.nivel,
+      hora_inicio =datos_clase.hora_inicio,hora_fin =datos_clase.hora_fin,
+      fecha =datos_clase.fecha,documento_profesor =datos_clase.documento_profesor, 
+      cupos= datos_clase.cupos
+)
+    try:
+        db.add(nueva_clase)
+        db.commit()
+        db.refresh(nueva_clase)
+        return f"clase Agregada Correctamente"
+    except SQLAlchemyError as e :
+        db.rollback()
+        raise HTTPException(status_code=400 ,detail=f"algo salio mal : {str(e)}")
+
+
+
+
 #-------------------------------------------------------------------------------------------------------------------------            
 #-------------------------------------------------------------------------------------------------------------------------            
 #-------------------------------------------------------------------------------------------------------------------------            

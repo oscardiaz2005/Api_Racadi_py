@@ -91,6 +91,7 @@ class ObservacionBase(BaseModel):
     fecha: Optional[date] = None  
     descripcion: str
     documento: str
+    creada_por: str
 
 class PlanBase(BaseModel):
     nombre: str
