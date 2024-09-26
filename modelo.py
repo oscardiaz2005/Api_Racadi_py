@@ -111,6 +111,7 @@ class Observacion(base):
     fecha = Column(Date, nullable=True, default=func.now())
     descripcion = Column(String(300), nullable=False)
     documento = Column(String(15), ForeignKey('estudiantes.documento', ondelete='CASCADE'), nullable=False)
+    creada_por =Column(String(50), nullable=False)
 
 
 class Plan(base):
