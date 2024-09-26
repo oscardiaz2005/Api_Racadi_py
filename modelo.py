@@ -45,7 +45,7 @@ class Estudiante(base):
     usuario = Column(String(30), nullable=False)
     contraseña = Column(String(60), nullable=False)
     nivel_actual = Column(Enum('beginner', 'basic 1', 'basic 2', 'intermediate', 'advanced'), nullable=False)
-    fecha_incripcion = Column(Date, nullable=True, default=func.now())
+    fecha_inscripcion = Column(Date, nullable=True, default=func.now())
     plan = Column(String(30), ForeignKey('planes.nombre'), nullable=False)
     foto_perfil = Column(String(300), nullable=True)
 

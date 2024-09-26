@@ -228,7 +228,7 @@ async def añadir_estudiante(datos_estudiante: EstudianteBase, db: Session = Dep
         celular=datos_estudiante.celular,correo=datos_estudiante.correo,direccion=datos_estudiante.direccion,
         sede=datos_estudiante.sede,usuario=datos_estudiante.usuario,contraseña=encriptar_contraseña(datos_estudiante.contraseña),
         nivel_actual=datos_estudiante.nivel_actual,
-        fecha_incripcion=datos_estudiante.fecha_incripcion,plan=datos_estudiante.plan,foto_perfil=datos_estudiante.foto_perfil
+        fecha_inscripcion=datos_estudiante.fecha_inscripcion,plan=datos_estudiante.plan,foto_perfil=datos_estudiante.foto_perfil
     )
 
     try:

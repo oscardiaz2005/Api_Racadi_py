@@ -41,7 +41,7 @@ class EstudianteBase(BaseModel):
     usuario: str
     contraseña: str
     nivel_actual: Literal['beginner', 'basic 1', 'basic 2', 'intermediate', 'advanced']
-    fecha_incripcion: Optional[date] = None 
+    fecha_inscripcion: Optional[date] = None 
     plan: str
     foto_perfil: Optional[str] = None
 
