@@ -25,6 +25,8 @@ def encriptar_contraseña(password):
 
 
 
+
+
 #FUNCION PARA VALIDAR CONTRASEÑAS
 def verificar_contraseña(contraseña):
     numeros = set("0123456789")
@@ -48,6 +50,15 @@ def verificar_contraseña(contraseña):
 
     contraseña_valida = (existe_numero and existe_char_especial and existe_mayuscula and len(contraseña) >= 8)
     return contraseña_valida
+
+
+#FUNCION PARA VALIDAR LONGITUD DE NUMERO
+def verify_cel(cel):
+    if len(cel)==10:
+        return True
+    else :
+        return False
+
 
 
 
@@ -114,3 +125,5 @@ def crear_token(datos: dict, tiempo_expiracion: timedelta = None):
     dato_codificado.update({"exp": expiracion})
     jwt_token = jwt.encode(dato_codificado, SECRET_KEY, algorithm=ALGORITMO)
     return jwt_token
+
+

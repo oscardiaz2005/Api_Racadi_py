@@ -4,7 +4,6 @@ from modelo import *
 from sqlalchemy.orm import Session 
 from fastapi.middleware.cors import CORSMiddleware
 from schemas import *
-import bcrypt
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import text
 #si no les agarra descarguen esto 'pip install fastapi uvicorn python-jose[cryptography] passlib'
@@ -12,6 +11,7 @@ from jose import JWTError,jwt
 from datetime import datetime,timedelta
 from fastapi.security import OAuth2PasswordBearer
 from funciones import *
+from funciones_crear_cuenta import *
 
 
 # DOCUMENTEN EL CODIGO (COMENTAR) PARA QUE NO SE HAGA UN SANCOCHO XFA
@@ -64,33 +64,18 @@ async def login(datos_login: LoginBase, db: Session = Depends(get_db)):
     if isinstance(usuario, Administrador):
         datos_token= {
             "rol": "administrador",
-                "administrador_id": usuario.administrador_id,
-                "correo": usuario.correo,
-                "usuario": usuario.usuario
+            "usuario": usuario.usuario
             
         }
     if isinstance(usuario, Estudiante):
         datos_token = {
             "rol": "estudiante",
-                "documento": usuario.documento,
-                "tipo_de_documento": usuario.tipo_de_documento,
-                "nombre": usuario.nombre,
-                "apellido": usuario.apellido,
-                "celular": usuario.celular,
-                "correo": usuario.correo,
-                "usuario": usuario.usuario,
-                "sede": usuario.sede
+            "usuario": usuario.usuario,
             }
     if isinstance(usuario, Profesor):
         datos_token =  {
             "rol": "profesor",
-                "documento": usuario.documento,
-                "tipo_de_documento": usuario.tipo_de_documento,
-                "nombre": usuario.nombre,
-                "apellido": usuario.apellido,
-                "celular": usuario.celular,
-                "correo": usuario.correo,
-                "usuario": usuario.usuario
+            "usuario": usuario.usuario
             }
 
      # Generar el token JWT 
@@ -136,31 +121,44 @@ async def read_users_me(current_user: dict = Depends(get_current_user)):
         return {
                 "rol": "administrador",
                 "administrador_id": current_user.administrador_id,
-                "correo": current_user.correo,
-                "usuario": current_user.usuario
+                "usuario": current_user.usuario,
+                "contraseña":current_user.contraseña
         }
     elif current_user.__class__.__name__.lower()=="estudiante":
-        return{
-                 "rol": "estudiante",
-                "documento": current_user.documento,
-                "tipo_de_documento": current_user.tipo_de_documento,
-                "nombre": current_user.nombre,
-                "apellido": current_user.apellido,
-                "celular": current_user.celular,
-                "correo": current_user.correo,
-                "usuario": current_user.usuario,
-                "sede": current_user.sede
+        return{  "rol": "estudiante",
+                "documento" : current_user.documento ,
+                "tipo_de_documento" : current_user.tipo_de_documento, 
+                "nombre": current_user.nombre, 
+                "apellido": current_user.apellido, 
+                "fecha_nacimiento": current_user.fecha_nacimiento, 
+                "genero": current_user.genero, 
+                "celular": current_user.celular, 
+                "correo": current_user.correo, 
+                "direccion": current_user.direccion, 
+                "sede": current_user.sede, 
+                "usuario": current_user.usuario, 
+                "contraseña": current_user.contraseña, 
+                "nivel_actual": current_user.nivel_actual, 
+                "fecha_incripcion": current_user.fecha_incripcion, 
+                "plan": current_user.plan, 
+                "foto_perfil": current_user.foto_perfil
         }   
     elif current_user.__class__.__name__.lower()=="profesor":
-        return{
-                 "rol": "profesor",
-                "documento": current_user.documento,
-                "tipo_de_documento": current_user.tipo_de_documento,
-                "nombre": current_user.nombre,
-                "apellido": current_user.apellido,
-                "celular": current_user.celular,
-                "correo": current_user.correo,
-                "usuario": current_user.usuario,
+   
+        return{  "rol": "profesor",
+                "documento" : current_user.documento ,
+                "tipo_de_documento" : current_user.tipo_de_documento, 
+                "nombre": current_user.nombre, 
+                "apellido": current_user.apellido, 
+                "fecha_nacimiento": current_user.fecha_nacimiento, 
+                "genero": current_user.genero, 
+                "celular": current_user.celular, 
+                "correo": current_user.correo, 
+                "direccion": current_user.direccion, 
+                "usuario": current_user.usuario, 
+                "contraseña": current_user.contraseña, 
+                "fecha_contratacion": current_user.fecha_incripcion, 
+                "foto_perfil": current_user.foto_perfil
         }          
  
 
@@ -189,11 +187,9 @@ async def add_admin(datos_administador:AdministradorBase , db: Session =Depends(
     #SE VERIFICA SI LA CONTRASEÑA ES VALIDA
     if not verificar_contraseña(datos_administador.contraseña):
         raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres , incluyendo números , caracteres especiales y  mayusculas")
-    #ENCRIPTACION DE LA CONTRASEÑA
-    encriptacion = bcrypt.hashpw(datos_administador.contraseña.encode('utf-8'),bcrypt.gensalt())
 
     #SE CREA UN NUEVO ADMIN CON LOS DATOS QUE INGRESEN , SEGUIDO A ESTO SE HACE EL ADD, COMMIT Y EL REFRESH A LA DATABASE
-    nuevo_administrador=Administrador(administrador_id=datos_administador.administrador_id,correo=datos_administador.correo,usuario=datos_administador.usuario,contraseña=encriptacion.decode('utf-8'))
+    nuevo_administrador=Administrador(administrador_id=datos_administador.administrador_id,usuario=datos_administador.usuario,contraseña=encriptar_contraseña(datos_administador.contraseña))
 
     #TRY PARA CAPTURAR UN POSIBLE ERROR
     try:
@@ -209,35 +205,51 @@ async def add_admin(datos_administador:AdministradorBase , db: Session =Depends(
 
 
 
-#METODO PARA AÑADIR ESTUDIANTES
 @app.post("/añadirestudiante")
-async def añadir_estudiante(datos_estudiante:EstudianteBase, db: Session =Depends(get_db)):
-    existe_documento=db.query(Estudiante).filter(Estudiante.documento==datos_estudiante.documento).first()
+async def añadir_estudiante(datos_estudiante: EstudianteBase, db: Session = Depends(get_db)):
+    existe_documento = db.query(Estudiante).filter(Estudiante.documento == datos_estudiante.documento).first()
     if existe_documento:
-        raise HTTPException (status_code=400, detail=f"el documento '{datos_estudiante.documento}' ya esta en uso ") 
-          
-    if usuario_existe_globalmente(datos_estudiante.usuario, db):
-        raise HTTPException(status_code=400, detail=f"El usuario '{datos_estudiante.usuario}' ya está en uso ")  
-    
-    if not verificar_contraseña(datos_estudiante.contraseña):
-        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres , incluyendo números , caracteres especiales y  mayusculas")
-    
-    encriptacion=bcrypt.hashpw(datos_estudiante.contraseña.encode('utf-8'),bcrypt.gensalt())
+        raise HTTPException(status_code=400, detail=f"El documento '{datos_estudiante.documento}' ya está en uso.")
 
-    nuevo_estudiante=Estudiante(
-        documento=datos_estudiante.documento,tipo_de_documento=datos_estudiante.tipo_de_documento,nombre=datos_estudiante.nombre,
-        apellido=datos_estudiante.apellido,celular=datos_estudiante.celular,correo=datos_estudiante.correo,usuario=datos_estudiante.usuario,contraseña=encriptacion.decode('utf-8'),
-        sede=datos_estudiante.sede)
+    if usuario_existe_globalmente(datos_estudiante.usuario, db):
+        raise HTTPException(status_code=400, detail=f"El usuario '{datos_estudiante.usuario}' ya está en uso.")
+
+    if not verificar_contraseña(datos_estudiante.contraseña):
+        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres, incluyendo números, caracteres especiales y mayúsculas.")
     
+    if not verify_cel(datos_estudiante.celular):
+        raise HTTPException(status_code=400, detail="Numero de Celular Invalido , no cumple con el estandar de 10 digitos")
+
+
+
+    nuevo_estudiante = Estudiante(
+        documento=datos_estudiante.documento,tipo_de_documento=datos_estudiante.tipo_de_documento,nombre=datos_estudiante.nombre,
+        apellido=datos_estudiante.apellido,fecha_nacimiento=datos_estudiante.fecha_nacimiento,genero=datos_estudiante.genero,
+        celular=datos_estudiante.celular,correo=datos_estudiante.correo,direccion=datos_estudiante.direccion,
+        sede=datos_estudiante.sede,usuario=datos_estudiante.usuario,contraseña=encriptar_contraseña(datos_estudiante.contraseña),
+        nivel_actual=datos_estudiante.nivel_actual,
+        fecha_incripcion=datos_estudiante.fecha_incripcion,plan=datos_estudiante.plan,foto_perfil=datos_estudiante.foto_perfil
+    )
+
     try:
         db.add(nuevo_estudiante)
         db.commit()
         db.refresh(nuevo_estudiante)
+        
+        nueva_cuenta = Cuenta(
+            documento=nuevo_estudiante.documento,
+            saldo=obtener_saldo(nuevo_estudiante.plan, db),
+            pago_minimo=obtener_pago_minimo(nuevo_estudiante.plan, db),
+            fecha_proximo_pago=obtener_fecha_proximo_pago(nuevo_estudiante.fecha_incripcion)
+        )
+        db.add(nueva_cuenta)
+        db.commit()
+        db.refresh(nueva_cuenta)
+
         return "Estudiante agregado exitosamente"
     except SQLAlchemyError as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Algo salió mal: {str(e)}")
-    
 
 
 
@@ -254,11 +266,15 @@ async def añadir_profesor(datos_profesor:ProfesorBase, db: Session =Depends(get
     if not verificar_contraseña(datos_profesor.contraseña):
         raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres , incluyendo números , caracteres especiales y  mayusculas")
     
-    encriptacion=bcrypt.hashpw(datos_profesor.contraseña.encode('utf-8'),bcrypt.gensalt())
-
-    nuevo_profesor=Profesor(
+    nuevo_profesor = Profesor(
         documento=datos_profesor.documento,tipo_de_documento=datos_profesor.tipo_de_documento,nombre=datos_profesor.nombre,
-        apellido=datos_profesor.apellido,celular=datos_profesor.celular,correo=datos_profesor.correo,usuario=datos_profesor.usuario,contraseña=encriptacion.decode('utf-8'),)
+        apellido=datos_profesor.apellido,fecha_nacimiento=datos_profesor.fecha_nacimiento,genero=datos_profesor.genero,
+        celular=datos_profesor.celular,correo=datos_profesor.correo,direccion=datos_profesor.direccion,
+        usuario=datos_profesor.usuario,contraseña=encriptar_contraseña(datos_profesor.contraseña),
+        fecha_contratacion=datos_profesor.fecha_contratacion,foto_perfil=datos_profesor.foto_perfil
+    )
+
+
     
     try:
         db.add(nuevo_profesor)
@@ -272,21 +288,28 @@ async def añadir_profesor(datos_profesor:ProfesorBase, db: Session =Depends(get
 
 
 
+#METODO PARA AÑADIR PLANES
+@app.post("/añadirplan")
+async def añadir_plan(datos_plan:PlanBase,db:Session=Depends(get_db)):
+    nuevo_plan=Plan(nombre=datos_plan.nombre,horas_semanales=datos_plan.horas_semanales,costo=datos_plan.costo,
+    meses=datos_plan.meses)
+    try:
+        db.add(nuevo_plan)
+        db.commit()
+        db.refresh(nuevo_plan)
+        return f"Plan Agregado Correctamente"
+    except SQLAlchemyError as e :
+        db.rollback()
+        raise HTTPException(status_code=400 ,detail=f"algo salio mal : {str(e)}")
 
 
 
+#-------------------------------------------------------------------------------------------------------------------------            
+#-------------------------------------------------------------------------------------------------------------------------            
+#-------------------------------------------------------------------------------------------------------------------------            
 
 
-
-
-
-
-
-
-
-##aca iran metodos delete put y get
-
-
+#METODOS DE CONSULTA (GET)
 
 
 ## METODO PARA CONSULTAR TODOS LOS ESTUDIANTES
@@ -300,15 +323,37 @@ async def get_estudiantes(db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=str(e))
     
 
+
 ## METODO PARA CONSULTAR TODOS LOS PROFESORES
 @app.get("/obtenerprofesores")
 async def get_profesores(db: Session = Depends(get_db)):
     try:
         profesores = db.query(Profesor).all()  # Obtener  todos los estudiantes
-        return profesores  # retornar los estudiantes,claramente no?
+        return profesores  # retornar los profsores,claramente no?
 
     except SQLAlchemyError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    
+
+
+@app.get("/obtenernombreplanes")
+async def obtener_nombre_planes (db:Session=Depends(get_db)):
+    try:
+        nombres_planes = db.query(Plan.nombre).all()  #se hace una busqueda de nombres (query es consulta en español) 
+        return [nombre[0] for nombre in nombres_planes ]  #Convierto el resultado que es un diccionario a un array
+
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    
+
+
+#-------------------------------------------------------------------------------------------------------------------------            
+#-------------------------------------------------------------------------------------------------------------------------            
+#-------------------------------------------------------------------------------------------------------------------------            
+
+
+#METODOS DE ELIMINACION (DELETE)    
 
 
 #METODO PARA ELIMINAR UN ESTUDIANTE
@@ -321,6 +366,36 @@ async def delete_estudiante(documento:str,db:Session=Depends(get_db)):
         return {"":f"estudiante con documento {documento} eliminado"}
     else:
         raise HTTPException (status_code=400, detail="no se encontro estudiante")
+
+
+
+
+
+#-------------------------------------------------------------------------------------------------------------------------            
+#-------------------------------------------------------------------------------------------------------------------------            
+#-------------------------------------------------------------------------------------------------------------------------            
+
+
+#METODOS DE EDICION/ACTUALIZACION (PUT)  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

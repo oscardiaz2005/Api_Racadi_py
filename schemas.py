@@ -1,111 +1,139 @@
 from pydantic import BaseModel
 from typing import Optional, Literal
 from datetime import date, time
+from sqlalchemy import Enum
 
-#modelos
+# Modelos
 
 class AdministradorBase(BaseModel):
     administrador_id: int
-    correo: str
     usuario: str
     contraseña: str
+
 
 class ProfesorBase(BaseModel):
     documento: str
     tipo_de_documento: Literal['cedula', 'cedula extranjera']
     nombre: str
     apellido: str
+    fecha_nacimiento: date
+    genero: Literal["masculino", "femenino", "otro"]
     celular: str
     correo: str
+    direccion: str
     usuario: str
     contraseña: str
+    fecha_contratacion: Optional[date] = None  
+    foto_perfil: Optional[str] = None
+
 
 class EstudianteBase(BaseModel):
     documento: str
     tipo_de_documento: Literal['cedula', 'cedula extranjera', 'tarjeta de identidad']
     nombre: str
     apellido: str
+    fecha_nacimiento: date
+    genero: Literal["masculino", "femenino", "otro"]
     celular: str
     correo: str
+    direccion: str
+    sede: Literal['madrid', 'mosquera', 'funza', 'facatativa', 'bogota']
     usuario: str
     contraseña: str
-    sede: Literal['madrid', 'mosquera', 'funza', 'facatativa', 'bogota']
+    nivel_actual: Literal['beginner', 'basic 1', 'basic 2', 'intermediate', 'advanced']
+    fecha_incripcion: Optional[date] = None 
+    plan: str
+    foto_perfil: Optional[str] = None
+
 
 class NivelBase(BaseModel):
     nombre_nivel: str
+    descripcion_nivel: str
+
 
 class RegistroEstudianteNivelBase(BaseModel):
     documento: str
-    nivel: str  # Enum: Puedes usar Literal aquí si defines los valores posibles
+    nivel: Literal['beginner', 'basic 1', 'basic 2', 'intermediate', 'advanced']  
     speaking: float
     listening: float
     reading: float
     writing: float
     nota_evaluacion: Optional[float] = None
-    aprobacion: Optional[bool] = None
+    aprobacion: Optional[bool] = None 
+
 
 class ClaseBase(BaseModel):
-    id_clase: int
+    id_clase: Optional[int]=None 
     sede: Literal['madrid', 'mosquera', 'funza', 'faca', 'bogota']
     nivel: Literal['beginner', 'basic 1', 'basic 2', 'intermediate', 'advanced']
-    hora_inicio: time
-    hora_fin: time
+    hora_inicio: time 
+    hora_fin: time 
     fecha: date
     documento_profesor: str
     cupos: int
-    administrador: int
+    administrador: Optional[int] = None
+
 
 class ReservaBase(BaseModel):
-    id_reserva: int
+    id_reserva: Optional [int] = None
     id_clase: int
     documento_estudiante: str
 
+
 class AsistenciaBase(BaseModel):
-    id_asistencia: int
+    id_asistencia: Optional [int] = None
     id_reserva: int
     asistencia: bool
 
+
 class ObservacionBase(BaseModel):
-    id_observacion: int
-    fecha: date
+    id_observacion: Optional [int] = None
+    fecha: Optional[date] = None  
     descripcion: str
     documento: str
 
 class PlanBase(BaseModel):
-    id_plan: str
     nombre: str
     horas_semanales: int
     costo: int
+    meses: int
+
 
 class CuentaBase(BaseModel):
     documento: str
     saldo: int
     pago_minimo: int
     fecha_proximo_pago: date
-    dias_mora: Optional[int]
-    plan: str
+    dias_mora: Optional[int] = None
+
 
 class PagoBase(BaseModel):
-    id_pago: int
-    fecha: date
+    id_pago: Optional [int] =None
+    fecha: Optional[date] = None 
     valor: int
-    cuenta: str
+    cuenta_documento: str
+
 
 class SolicitudBase(BaseModel):
-    id_solicitud: int
+    id_solicitud: Optional[int] = None
     documento: str
     descripcion: str
-    respuesta: Optional[str]
-    costestacion: bool
+    respuesta: Optional[str] = None
+    contestacion: bool = False
+    fecha_creacion: Optional[date] = None  
+
 
 class ComunicadoBase(BaseModel):
-    id_comunicado: int
-    administrador: int
+    id_comunicado:  Optional [int] =None
+    administrador: Optional[int] = None
+    titulo: str
     descripcion: str
+    foto: Optional[str] = None
 
-#Clase que maneja los logins
+
+# Clase que maneja los logins
 class LoginBase(BaseModel):
     usuario: str
     contraseña: str
-    rol: Optional[str] = None 
-    mensaje: Optional[str] = None 
+    rol: Optional[str] = None
+
