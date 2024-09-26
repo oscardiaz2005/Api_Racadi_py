@@ -139,7 +139,7 @@ async def read_users_me(current_user: dict = Depends(get_current_user)):
                 "usuario": current_user.usuario, 
                 "contraseña": current_user.contraseña, 
                 "nivel_actual": current_user.nivel_actual, 
-                "fecha_incripcion": current_user.fecha_incripcion, 
+                "fecha_inscripcion": current_user.fecha_inscripcion, 
                 "plan": current_user.plan, 
                 "foto_perfil": current_user.foto_perfil
         }   
@@ -157,7 +157,7 @@ async def read_users_me(current_user: dict = Depends(get_current_user)):
                 "direccion": current_user.direccion, 
                 "usuario": current_user.usuario, 
                 "contraseña": current_user.contraseña, 
-                "fecha_contratacion": current_user.fecha_incripcion, 
+                "fecha_contratacion": current_user.fecha_contratacion, 
                 "foto_perfil": current_user.foto_perfil
         }          
  
@@ -240,7 +240,7 @@ async def añadir_estudiante(datos_estudiante: EstudianteBase, db: Session = Dep
             documento=nuevo_estudiante.documento,
             saldo=obtener_saldo(nuevo_estudiante.plan, db),
             pago_minimo=obtener_pago_minimo(nuevo_estudiante.plan, db),
-            fecha_proximo_pago=obtener_fecha_proximo_pago(nuevo_estudiante.fecha_incripcion)
+            fecha_proximo_pago=obtener_fecha_proximo_pago(nuevo_estudiante.fecha_inscripcion)
         )
         db.add(nueva_cuenta)
         db.commit()
@@ -287,7 +287,6 @@ async def añadir_profesor(datos_profesor:ProfesorBase, db: Session =Depends(get
     
 
 
-
 #METODO PARA AÑADIR PLANES
 @app.post("/añadirplan")
 async def añadir_plan(datos_plan:PlanBase,db:Session=Depends(get_db)):
@@ -298,6 +297,21 @@ async def añadir_plan(datos_plan:PlanBase,db:Session=Depends(get_db)):
         db.commit()
         db.refresh(nuevo_plan)
         return f"Plan Agregado Correctamente"
+    except SQLAlchemyError as e :
+        db.rollback()
+        raise HTTPException(status_code=400 ,detail=f"algo salio mal : {str(e)}")
+    
+
+
+#METODO PARA AÑADIR NIVELES
+@app.post("/añadirnivel")
+async def añadir_plan(datos_nivel:NivelBase,db:Session=Depends(get_db)):
+    nuevo_nivel=Nivel(nombre_nivel=datos_nivel.nombre_nivel,descripcion_nivel=datos_nivel.descripcion_nivel)
+    try:
+        db.add(nuevo_nivel)
+        db.commit()
+        db.refresh(nuevo_nivel)
+        return f"Nivel Agregado Correctamente"
     except SQLAlchemyError as e :
         db.rollback()
         raise HTTPException(status_code=400 ,detail=f"algo salio mal : {str(e)}")
@@ -336,11 +350,24 @@ async def get_profesores(db: Session = Depends(get_db)):
     
 
 
+## METODO PARA CONSULTAR EL NOMBRE DE LOS PLANES
 @app.get("/obtenernombreplanes")
 async def obtener_nombre_planes (db:Session=Depends(get_db)):
     try:
         nombres_planes = db.query(Plan.nombre).all()  #se hace una busqueda de nombres (query es consulta en español) 
         return [nombre[0] for nombre in nombres_planes ]  #Convierto el resultado que es un diccionario a un array
+
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+
+
+## METODO PARA CONSULTAR EL NOMBRE DE LOS NIVELES
+@app.get("/obtenernombreniveles")
+async def obtener_nombre_nivels (db:Session=Depends(get_db)):
+    try:
+        nombres_niveles = db.query(Nivel.nombre_nivel).all()  #se hace una busqueda de nombres (query es consulta en español) 
+        return [nombre[0] for nombre in nombres_niveles ]  #Convierto el resultado que es un diccionario a un array
 
     except SQLAlchemyError as e:
         raise HTTPException(status_code=400, detail=str(e))
