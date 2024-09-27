@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker
 
 
 #url de la base de datos , toca que cambien la contraseña a la de ustedes cada vez que quieran probar
-URL_DB="mysql+mysqlconnector://root:Junior/Programer1@localhost:3306/racadi_academy"
+URL_DB="mysql+mysqlconnector://root:osjdiaz123@localhost:3306/racadi_academy"
 crear=create_engine(URL_DB)
 SessionLocal=sessionmaker(autocommit=False,autoflush=False, bind=crear)
 base=declarative_base()
