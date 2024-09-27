@@ -24,7 +24,7 @@ app=FastAPI()
 #PERMITIR EL USO DE LA API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  
+    allow_origins=["*"],  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -99,6 +99,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITMO])
         # Obtener el nombre de usuario  desde el token
+        print(payload)
         usuario: str = payload.get("usuario")
         if usuario is None:
             raise credentials_exception
@@ -113,6 +114,27 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
         raise credentials_exception
     
     return user
+
+#funcion para tener la cuenta del estudiante
+async def get_current_count_student(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITMO])
+        # Obtener el nombre la cuenta  desde el token
+        print(payload)
+        cuenta: str = payload.get("documento")
+        if cuenta is None:
+            raise credentials_exception
+    except JWTError:
+        # Si hay un error en el token o ha expiracion
+        raise credentials_exception
+    
+    #Obtener los mdatos de la cuenta del usuaruio desde la base de datos
+    count= obtener_datos_cuenta(cuenta, db)
+    if count is None:
+        raise credentials_exception
+
+    return count
 
 # Endpoint protegido para obtener el usuario actual
 @app.get("/users/me")
@@ -237,6 +259,7 @@ async def añadir_estudiante(datos_estudiante: EstudianteBase, db: Session = Dep
         db.refresh(nuevo_estudiante)
         
         nueva_cuenta = Cuenta(
+            pagare=None,
             documento=nuevo_estudiante.documento,
             saldo=obtener_saldo(nuevo_estudiante.plan, db),
             pago_minimo=obtener_pago_minimo(nuevo_estudiante.plan, db),
@@ -337,6 +360,38 @@ async def añadir_clase(datos_clase:ClaseBase,db:Session=Depends(get_db)):
         raise HTTPException(status_code=400 ,detail=f"algo salio mal : {str(e)}")
 
 
+#METODO PARA VER SI EL USUARIO DE PAGO EXISTE
+@app.post('/verificar_pago')
+async def verificar_usuario_pago(datos_cuenta:VerficarUsuario, db:Session=Depends(get_db)):
+    #Obtener datos de la cuenta
+    cuentabd= obtener_datos_cuenta(datos_cuenta.documento, db)
+
+
+    cuenta=db.query(Estudiante).filter(Estudiante.documento==datos_cuenta.documento).first()
+    datos=db.query(Cuenta).filter(Cuenta.documento==datos_cuenta.documento).first()
+
+    if not cuenta:
+        return {f'El documento que ingreso no se encuentra en la base de datos', datos_cuenta.documento}
+    # Crear los datos del token
+    datos_token = {
+        "pagare": cuentabd.pagare,
+        "documento": cuentabd.documento,
+        "saldo": cuentabd.saldo,
+        "pago_minimo": cuentabd.pago_minimo,
+        #Se pone isoformat para que tome la rfecha como un string y no como tipo date
+        "fecha_proximo_pago": cuentabd.fecha_proximo_pago.isoformat(),
+        "dias_mora": cuentabd.dias_mora
+    }
+
+    db.commit()
+    db.refresh(cuenta)
+    # Generar el token JWT 
+    token_acceso = crear_token(datos=datos_token, tiempo_expiracion=timedelta(minutes=MINUTOS_DE_EXPIRACION))
+    return {"access_token": token_acceso, 
+            "token_type": "bearer",
+            "documento": datos_token}
+
+
 
 
 #-------------------------------------------------------------------------------------------------------------------------            
@@ -363,7 +418,7 @@ async def get_estudiantes(db: Session = Depends(get_db)):
 @app.get("/obtenerprofesores")
 async def get_profesores(db: Session = Depends(get_db)):
     try:
-        profesores = db.query(Profesor).all()  # Obtener  todos los estudiantes
+        profesores = db.query(Profesor).all()  # Obtener  todos los profesores
         return profesores  # retornar los profsores,claramente no?
 
     except SQLAlchemyError as e:
@@ -394,7 +449,17 @@ async def obtener_nombre_nivels (db:Session=Depends(get_db)):
         raise HTTPException(status_code=400, detail=str(e))
     
     
-
+#METODO PARA TRAER LA INFORMACION DE LA CUENTA
+@app.get("/datos_cuenta")
+async def obtener_cuenta(cuenta : dict =Depends(get_current_count_student)):
+            return {
+                    "Pagare": cuenta.pagare,
+                    "Documento": cuenta.documento,
+                    "Saldo": cuenta.saldo,
+                    "Pago Minimo":cuenta.pago_minimo,
+                    "Fecha del proximo pago": cuenta.fecha_proximo_pago,
+                    "Dias de mora": cuenta.dias_mora
+                    }
 
 #-------------------------------------------------------------------------------------------------------------------------            
 #-------------------------------------------------------------------------------------------------------------------------            

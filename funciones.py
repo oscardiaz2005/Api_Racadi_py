@@ -16,9 +16,13 @@ MINUTOS_DE_EXPIRACION = 30
 
 ## Encriptacion de contraseñas
 encriptacion = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
 # Función para verificar la contraseña
 def verificar_contraseña_login(contraseña, hashed_contraseña):
-    return encriptacion.verify(contraseña, hashed_contraseña)
+    return encriptacion.verify(contraseña, hashed_contraseña) 
+
+    
 # Función para obtener el hash de una contraseña
 def encriptar_contraseña(password):
     return encriptacion.hash(password)
@@ -127,3 +131,8 @@ def crear_token(datos: dict, tiempo_expiracion: timedelta = None):
     return jwt_token
 
 
+#OBTENER DATOS DE LA CUENTA
+def obtener_datos_cuenta(documento:str, db:Session):
+    #Verifica si la cuenta esta creada o no
+    cuenta = db.query(Cuenta).filter(Cuenta.documento == documento).first()
+    return cuenta
