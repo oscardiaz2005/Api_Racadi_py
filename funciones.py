@@ -5,6 +5,8 @@ from schemas import *
 from jose import jwt
 from datetime import datetime,timedelta
 from passlib.context import CryptContext
+from fastapi import HTTPException
+
 
 
 
@@ -125,5 +127,6 @@ def crear_token(datos: dict, tiempo_expiracion: timedelta = None):
     dato_codificado.update({"exp": expiracion})
     jwt_token = jwt.encode(dato_codificado, SECRET_KEY, algorithm=ALGORITMO)
     return jwt_token
+
 
 

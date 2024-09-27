@@ -5,13 +5,15 @@ from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 from schemas import *
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import text
+from sqlalchemy import text , or_
 #si no les agarra descarguen esto 'pip install fastapi uvicorn python-jose[cryptography] passlib'
 from jose import JWTError,jwt
 from datetime import datetime,timedelta
 from fastapi.security import OAuth2PasswordBearer
 from funciones import *
 from funciones_crear_cuenta import *
+from funciones_validacion_clases import *
+from typing import List
 
 
 # DOCUMENTEN EL CODIGO (COMENTAR) PARA QUE NO SE HAGA UN SANCOCHO XFA
@@ -24,7 +26,7 @@ app=FastAPI()
 #PERMITIR EL USO DE LA API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  
+    allow_origins=["*"],  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -320,21 +322,53 @@ async def añadir_plan(datos_nivel:NivelBase,db:Session=Depends(get_db)):
 
 #METODO PARA AÑADIR CLASES
 @app.post("/añadirclase")
-async def añadir_clase(datos_clase:ClaseBase,db:Session=Depends(get_db)):
-    nueva_clase=Clase(
-      sede= datos_clase.sede,nivel = datos_clase.nivel,
-      hora_inicio =datos_clase.hora_inicio,hora_fin =datos_clase.hora_fin,
-      fecha =datos_clase.fecha,documento_profesor =datos_clase.documento_profesor, 
-      cupos= datos_clase.cupos
-)
+async def añadir_clase(datos_clase: ClaseBase, db: Session = Depends(get_db)):
+    # Verificar si hora_inicio y hora_fin son cadenas y convertirlas a time
+    if isinstance(datos_clase.hora_inicio, str):
+        try:
+            hora_inicio = datetime.strptime(datos_clase.hora_inicio, "%H:%M").time()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Formato de hora de inicio no válido. Use HH:MM.")
+    else:
+        hora_inicio = datos_clase.hora_inicio
+
+    if isinstance(datos_clase.hora_fin, str):
+        try:
+            hora_fin = datetime.strptime(datos_clase.hora_fin, "%H:%M").time()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Formato de hora de fin no válido. Use HH:MM.")
+    else:
+        hora_fin = datos_clase.hora_fin
+
+    # Realizar validaciones
+    validar_fecha(datos_clase.fecha)
+    validar_horas(hora_inicio, hora_fin)  # Cambiar a usar time
+    validar_horarios_disponibles(hora_inicio)
+    validar_clases_duplicadas(datos_clase, db)
+    validar_conflictos_profesor(datos_clase.documento_profesor, datos_clase.fecha, hora_inicio, db)
+
+    if not verify_cupos(datos_clase.cupos):
+        raise HTTPException(status_code=400, detail="Cupos inválidos, rango aceptado de 1 a 15")
+
+    nueva_clase = Clase(
+        sede=datos_clase.sede,
+        nivel=datos_clase.nivel,
+        hora_inicio=hora_inicio,
+        hora_fin=hora_fin,
+        fecha=datos_clase.fecha,
+        documento_profesor=datos_clase.documento_profesor,
+        cupos=datos_clase.cupos
+    )
+
     try:
         db.add(nueva_clase)
         db.commit()
         db.refresh(nueva_clase)
-        return f"clase Agregada Correctamente"
-    except SQLAlchemyError as e :
+        return "Clase agregada correctamente"
+    except SQLAlchemyError as e:
         db.rollback()
-        raise HTTPException(status_code=400 ,detail=f"algo salio mal : {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Algo salió mal: {str(e)}")
+
 
 
 
@@ -359,17 +393,56 @@ async def get_estudiantes(db: Session = Depends(get_db)):
     
 
 
+## METODO PARA CONSULTAR ESTUDIANTE POR DOCUMENTO
+@app.get("/obtenerestudiante/{documento}")
+async def get_estudiantes_documento( documento:str,db: Session = Depends(get_db)):
+    
+     estudiante = db.query(Estudiante).filter(Estudiante.documento==documento).first()  # Comparar documentos
+     if estudiante:
+        return estudiante # retornar el estudiantee,claramente no?
+     else:
+        raise HTTPException (status_code=400, detail="no se encontro estudiante")
+        
+         
+         
+
+
+
+
+
 ## METODO PARA CONSULTAR TODOS LOS PROFESORES
 @app.get("/obtenerprofesores")
 async def get_profesores(db: Session = Depends(get_db)):
     try:
-        profesores = db.query(Profesor).all()  # Obtener  todos los estudiantes
+        profesores = db.query(Profesor).all()  # Obtener  todos los profesores
         return profesores  # retornar los profsores,claramente no?
 
     except SQLAlchemyError as e:
         raise HTTPException(status_code=400, detail=str(e))
     
 
+
+#METODO PARA BUSQUEDA REACTIVA DE PROFESORES POR NOMBRE
+@app.get("/buscarprofesores", response_model=List[dict])
+async def buscar_profesores(nombre: str, db: Session = Depends(get_db)):
+    # Filtra los profesores directamente en la consulta
+    profesores = db.query(Profesor).filter(
+        or_(
+            Profesor.nombre.ilike(f"%{nombre}%"),  # Búsqueda insensible a mayúsculas/minúsculas
+            Profesor.apellido.ilike(f"%{nombre}%")
+        )
+    ).all()
+
+    resultados = [
+        {
+            "documento": profesor.documento,
+            "nombre": profesor.nombre,
+            "apellido": profesor.apellido,
+        }
+        for profesor in profesores
+    ]
+    
+    return resultados
 
 ## METODO PARA CONSULTAR EL NOMBRE DE LOS PLANES
 @app.get("/obtenernombreplanes")
