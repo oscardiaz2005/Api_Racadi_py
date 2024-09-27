@@ -59,3 +59,10 @@ def validar_conflictos_profesor(documento_profesor: str, fecha: datetime, hora_i
 def validar_fecha(fecha: datetime):
     if fecha < datetime.now().date():
         raise HTTPException(status_code=400, detail="La fecha no puede ser anterior al día de hoy.")
+    
+def validar_profesor(documento:str , db :Session) :
+    exist=db.query(Profesor).filter(documento == Profesor.documento).first()
+    if not exist:
+        raise HTTPException(status_code=400, detail="El documento no coincide con ninguno de nuestros profesores:).")
+
+        

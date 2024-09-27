@@ -342,10 +342,11 @@ async def añadir_clase(datos_clase: ClaseBase, db: Session = Depends(get_db)):
 
     # Realizar validaciones
     validar_fecha(datos_clase.fecha)
-    validar_horas(hora_inicio, hora_fin)  # Cambiar a usar time
+    validar_horas(hora_inicio, hora_fin)  
     validar_horarios_disponibles(hora_inicio)
     validar_clases_duplicadas(datos_clase, db)
     validar_conflictos_profesor(datos_clase.documento_profesor, datos_clase.fecha, hora_inicio, db)
+    validar_profesor(datos_clase.documento_profesor,db)
 
     if not verify_cupos(datos_clase.cupos):
         raise HTTPException(status_code=400, detail="Cupos inválidos, rango aceptado de 1 a 15")
