@@ -128,7 +128,7 @@ class Cuenta(base):
     saldo = Column(Integer, nullable=False)
     pago_minimo = Column(Integer, nullable=False)
     fecha_proximo_pago = Column(Date, nullable=False)
-    dias_mora = Column(Integer)
+    dias_mora = Column(Integer,default=0)
 
     
 

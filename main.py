@@ -24,7 +24,7 @@ app=FastAPI()
 #PERMITIR EL USO DE LA API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  
+    allow_origins=["*"],  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -337,8 +337,20 @@ async def añadir_clase(datos_clase:ClaseBase,db:Session=Depends(get_db)):
         raise HTTPException(status_code=400 ,detail=f"algo salio mal : {str(e)}")
 
 
-
-
+@app.post("/añadirObservacion")
+async def añadir_observacion(datos_observacion:ObservacionBase , db:Session=Depends(get_db)):
+    
+    try:
+          nueva_observacion=Observacion(descripcion=datos_observacion.descripcion,documento=datos_observacion.documento,creada_por=datos_observacion.creada_por)
+          db.add(nueva_observacion) 
+          db.commit()
+          db.refresh(nueva_observacion)
+          return f"Observacion fue agregada"
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=400 ,detail=f"algo salio mal : {str(e)}")
+        
+        
 #-------------------------------------------------------------------------------------------------------------------------            
 #-------------------------------------------------------------------------------------------------------------------------            
 #-------------------------------------------------------------------------------------------------------------------------            
@@ -393,6 +405,43 @@ async def obtener_nombre_nivels (db:Session=Depends(get_db)):
     except SQLAlchemyError as e:
         raise HTTPException(status_code=400, detail=str(e))
     
+##filtrar los observadores por dicumento de estudiante
+@app.get("/filtro_ObservadoresDocumento/{documento}")
+async def filtro_observaciones_por_documento(documento: str, db: Session = Depends(get_db)):
+    try:
+        # Realiza la consulta a la base de datos para filtrar por documento
+        observaciones = db.query(Observacion).filter(Observacion.documento == documento).all()
+
+        # Si no se encontraron observaciones, se lanza una excepción
+        if not observaciones:
+            raise HTTPException(status_code=404, detail="No se encontraron observaciones para el documento proporcionado.")
+        
+        return observaciones
+
+    except SQLAlchemyError as e:
+        # Si hay un error en la consulta, se lanza una excepción con el mensaje de error
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    
+    
+#Es para mostrar las observaciones del estudinate en la vista estudiante flitrados por fecha
+@app.get("/filtro_ObservadoresFecha/{documento}/{fecha}")
+async def filtro_observaciones_por_documento(documento: str,fecha:str, db: Session = Depends(get_db)):
+    try:
+        # Realiza la consulta a la base de datos para filtrar por documento
+        observaciones = db.query(Observacion).filter(Observacion.documento == documento) and db.query(Observacion).filter(Observacion.fecha == fecha) .all()
+
+        # Si no se encontraron observaciones, se lanza una excepción
+        if not observaciones:
+            raise HTTPException(status_code=404, detail="No se encontraron observaciones para el documento proporcionado.")
+        
+        return observaciones
+
+    except SQLAlchemyError as e:
+        # Si hay un error en la consulta, se lanza una excepción con el mensaje de error
+        raise HTTPException(status_code=400, detail=str(e))
+    
+   
     
 
 
