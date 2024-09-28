@@ -433,7 +433,7 @@ async def filtro_observaciones_por_documento(documento: str,fecha:str, db: Sessi
 
         # Si no se encontraron observaciones, se lanza una excepción
         if not observaciones:
-            raise HTTPException(status_code=404, detail="No se encontraron observaciones para el documento proporcionado.")
+            raise HTTPException(status_code=404, detail="No se encontraron observaciones para el documento proporcionadoo.")
         
         return observaciones
 
