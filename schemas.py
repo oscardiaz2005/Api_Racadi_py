@@ -64,7 +64,7 @@ class RegistroEstudianteNivelBase(BaseModel):
 
 class ClaseBase(BaseModel):
     id_clase: Optional[int]=None 
-    sede: Literal['madrid', 'mosquera', 'funza', 'faca', 'bogota']
+    sede: Literal['madrid', 'mosquera', 'funza', 'facatativa', 'bogota']
     nivel: Literal['beginner', 'basic 1', 'basic 2', 'intermediate', 'advanced']
     hora_inicio: time 
     hora_fin: time 
@@ -79,7 +79,6 @@ class VerficarUsuario(BaseModel):
 
 
 class ReservaBase(BaseModel):
-    id_reserva: Optional [int] = None
     id_clase: int
     documento_estudiante: str
 
