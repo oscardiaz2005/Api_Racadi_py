@@ -470,19 +470,6 @@ async def reservar_clase(datos_reserva: ReservaBase, db: Session = Depends(get_d
         raise HTTPException(status_code=400, detail=f"Algo salió mal: {str(e)}")
 
 
-    
-
-
-
-
-
-
-        
-
-    
-
-
-
 
 
 #METODO PARA VER SI EL USUARIO DE PAGO EXISTE
@@ -850,18 +837,3 @@ async def actualizar_solicitud(id: int, solicitud: SolicitudBase, db: Session = 
     })
     db.commit()
     return {"message": "Solicitud actualizada con éxito"}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
