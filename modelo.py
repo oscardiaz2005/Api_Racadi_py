@@ -124,7 +124,7 @@ class Plan(base):
 
 class Cuenta(base):
     __tablename__ = 'cuentas'
-    pagare= Column(Integer, Identity(start=1, cycle=True), primary_key=True)
+    pagare= Column(Integer, autoincrement=True , nullable=True)
     documento = Column(String(15), ForeignKey('estudiantes.documento', ondelete='CASCADE'), primary_key=True)
     saldo = Column(Integer, nullable=False)
     pago_minimo = Column(Integer, nullable=False)

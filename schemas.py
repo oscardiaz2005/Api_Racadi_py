@@ -104,7 +104,7 @@ class PlanBase(BaseModel):
 
 
 class CuentaBase(BaseModel):
-    pagare: int
+    pagare: Optional [int] = None
     documento: str
     saldo: int
     pago_minimo: int
