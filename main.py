@@ -773,7 +773,7 @@ async def delete_estudiante(documento:str,db:Session=Depends(get_db)):
 
 
 #METODO PARA ELIMINAR UNA SOLICITUD 
-@app.delete("/elimina_solicitud/{id}")
+@app.delete("/eliminar_solicitud/{id}")
 async def delete_solicitud(id:int,db:Session=Depends(get_db)):
     solicitud_encontrada=db.query(Solicitud).filter(id==Solicitud.id_solicitud).first()
     if solicitud_encontrada:
