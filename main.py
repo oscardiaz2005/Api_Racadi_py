@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 from schemas import *
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import text , or_
+from sqlalchemy import text , or_ , and_
 #si no les agarra descarguen esto 'pip install fastapi uvicorn python-jose[cryptography] passlib'
 from jose import JWTError,jwt
 from datetime import datetime,timedelta
@@ -369,6 +369,95 @@ async def añadir_clase(datos_clase: ClaseBase, db: Session = Depends(get_db)):
     except SQLAlchemyError as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Algo salió mal: {str(e)}")
+    
+
+
+#METODO PARA RESERVAR CLASES
+@app.post("/reservar_clase")
+async def reservar_clase(datos_reserva: ReservaBase, db: Session = Depends(get_db)):
+    clase = db.query(Clase).filter(Clase.id_clase == datos_reserva.id_clase).first()
+    estudiante = db.query(Estudiante).filter(Estudiante.documento == datos_reserva.documento_estudiante).first()
+    
+    if clase is None:
+        raise HTTPException(status_code=404, detail="Clase no encontrada")
+    
+    if estudiante is None:
+        raise HTTPException(status_code=404, detail="Estudiante no encontrado")
+
+    # Combinar fecha y hora de inicio para obtener un objeto datetime
+    hora_inicio_clase = datetime.combine(clase.fecha, clase.hora_inicio)
+
+    ahora = datetime.now()
+    if hora_inicio_clase - ahora < timedelta(hours=2):
+        raise HTTPException(status_code=400, detail="No se puede reservar con menos de 2 horas de antelación")
+    
+    existe_reserva = db.query(Reserva).filter(
+        and_(Reserva.id_clase == datos_reserva.id_clase,
+             Reserva.documento_estudiante == datos_reserva.documento_estudiante)
+    ).first()
+    if existe_reserva:
+        raise HTTPException(status_code=400, detail="Clase ya reservada")
+
+    if clase.cupos == 0:
+        raise HTTPException(status_code=400, detail="Esta clase ya no tiene cupos disponibles")
+
+
+    # Verificar las horas semanales reservadas por el estudiante
+
+    plan = db.query(Plan).filter(Plan.nombre == estudiante.plan).first()
+
+    if plan is None:
+        raise HTTPException(status_code=404, detail="Plan no encontrado")
+
+    # Calcular el inicio de la semana (lunes) y el fin de la semana (domingo)
+    hoy = ahora.date()
+    inicio_semana = hoy - timedelta(days=hoy.weekday())  
+    fin_semana = inicio_semana + timedelta(days=6)  
+
+
+    reservas_semana = db.query(Reserva).join(Clase, Reserva.id_clase == Clase.id_clase).filter(
+        and_(
+            Reserva.documento_estudiante == datos_reserva.documento_estudiante,
+            Clase.fecha >= inicio_semana,
+            Clase.fecha <= fin_semana
+        )
+    ).all()
+
+    horas_reservadas = len(reservas_semana) * 2  # *2 porque Cada clase dura 2 horas
+
+    if horas_reservadas + 2 > plan.horas_semanales:
+        raise HTTPException(status_code=400, detail=f"Has alcanzado tu límite semanal de {plan.horas_semanales} horas")
+
+    try:
+        nueva_reserva = Reserva(
+            documento_estudiante=datos_reserva.documento_estudiante,
+            id_clase=datos_reserva.id_clase
+        )
+        db.add(nueva_reserva)
+        
+        # Disminuir cupos disponibles de la clase
+        clase.cupos -= 1
+        
+        db.commit()
+        db.refresh(nueva_reserva)
+        
+        return {"message": "Clase reservada exitosamente"}
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Algo salió mal: {str(e)}")
+
+
+    
+
+
+
+
+
+
+        
+
+    
+
 
 
 
@@ -466,6 +555,53 @@ async def obtener_nombre_nivels (db:Session=Depends(get_db)):
 
     except SQLAlchemyError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+
+#METODO PARA OBTENER LAS CLASES CORRESPONDIENTES A UN ESTUDIANTE
+@app.get("/obtenerclasesestudiante/{sede}/{nivel}")
+async def obtenerclasesestudiante(sede:str,nivel:str , db:Session=Depends(get_db)):
+    try :
+        clases_estudiante=db.query(Clase).filter(
+            and_(
+                Clase.sede==sede,
+                Clase.nivel==nivel
+            )
+        ).all()
+        resultados=[
+            {
+                "id_clase":clase.id_clase,
+                "sede" :clase.sede,
+                "nivel" :clase.nivel ,
+                "hora_inicio" :clase.hora_inicio,
+                "hora_fin" :clase.hora_fin,
+                "fecha" :clase.fecha,
+                "profesor":get_name_teacher_by_dni(clase.documento_profesor,db),
+                "cupos" :clase.cupos
+            }
+            for clase in clases_estudiante
+        ]    
+        if resultados:
+            return resultados
+        else:
+            raise HTTPException(status_code=400,detail=f"No Hay Clases Para la Sede {sede} y nivel {nivel} esta semana")
+        
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+
+
+#METODO PARA OBTENER RESERVAS DE UN ESTUDIANTE    
+@app.get("/obtener_reservas/{documento_estudiante}")
+async def obtener_reservas(documento_estudiante: str, db: Session = Depends(get_db)):
+    reservas = db.query(Reserva).filter(Reserva.documento_estudiante == documento_estudiante).all()
+    
+    if not reservas:
+        return []
+
+    return reservas
+
+    
     
     
 
@@ -488,6 +624,52 @@ async def delete_estudiante(documento:str,db:Session=Depends(get_db)):
         return {"":f"estudiante con documento {documento} eliminado"}
     else:
         raise HTTPException (status_code=400, detail="no se encontro estudiante")
+
+
+
+
+
+#METODO PARA CANCELAR UNA RESERVA
+@app.delete("/cancelar_reserva")
+async def cancelar_reserva(datos_reserva: ReservaBase, db: Session = Depends(get_db)):
+    clase = db.query(Clase).filter(Clase.id_clase == datos_reserva.id_clase).first()
+    
+    if clase is None:
+        raise HTTPException(status_code=404, detail="Clase no encontrada")
+
+    # Combinar fecha y hora de inicio para obtener un objeto datetime
+    hora_inicio_clase = datetime.combine(clase.fecha, clase.hora_inicio)
+    
+    # Verificar si faltan menos de 2 horas para la clase
+    ahora = datetime.now()
+    if hora_inicio_clase - ahora < timedelta(hours=2):
+        raise HTTPException(status_code=400, detail="No se puede cancelar con menos de 2 horas de antelación")
+
+    # Buscar la reserva
+    reserva = db.query(Reserva).filter(
+        and_(Reserva.id_clase == datos_reserva.id_clase,
+             Reserva.documento_estudiante == datos_reserva.documento_estudiante)
+    ).first()
+    
+    if reserva is None:
+        raise HTTPException(status_code=404, detail="Reserva no encontrada")
+
+    try:
+        # Eliminar la reserva
+        db.delete(reserva)
+        
+        # Aumentar los cupos disponibles de la clase
+        clase.cupos += 1
+        
+        db.commit()
+        
+        return {"message": "Reserva cancelada exitosamente"}
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Algo salió mal: {str(e)}")
+
+
+
 
 
 

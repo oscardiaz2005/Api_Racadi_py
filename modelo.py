@@ -4,7 +4,6 @@ from conexion import base
 from sqlalchemy.sql import func
 
 
-
 # Creación de tablas
 
 class Administrador(base):
@@ -82,7 +81,7 @@ event.listen(RegistroEstudianteNivel, 'before_update', RegistroEstudianteNivel.c
 class Clase(base):
     __tablename__ = 'clases'
     id_clase = Column(Integer, primary_key=True, autoincrement=True)
-    sede = Column(Enum('madrid', 'mosquera', 'funza', 'faca', 'bogota'), nullable=False)
+    sede = Column(Enum('madrid', 'mosquera', 'funza', 'facatativa', 'bogota'), nullable=False)
     nivel = Column(Enum('beginner', 'basic 1', 'basic 2', 'intermediate', 'advanced'), nullable=False)
     hora_inicio = Column(Time, nullable=False)
     hora_fin = Column(Time, nullable=False)
@@ -129,7 +128,7 @@ class Cuenta(base):
     saldo = Column(Integer, nullable=False)
     pago_minimo = Column(Integer, nullable=False)
     fecha_proximo_pago = Column(Date, nullable=False)
-    dias_mora = Column(Integer, default=0)
+    dias_mora = Column(Integer)
 
     
 
