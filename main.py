@@ -682,10 +682,6 @@ async def filtro_observaciones_por_documento(documento: str, db: Session = Depen
         # Realiza la consulta a la base de datos para filtrar por documento
         observaciones = db.query(Observacion).filter(Observacion.documento == documento).all()
 
-        # Si no se encontraron observaciones, se lanza una excepción
-        if not observaciones:
-            raise HTTPException(status_code=404, detail="No se encontraron observaciones para el documento proporcionado.")
-        
         return observaciones
 
     except SQLAlchemyError as e:
@@ -700,13 +696,7 @@ async def filtro_observaciones_por_documento(documento: str,fecha:str, db: Sessi
     try:
         # Realiza la consulta a la base de datos para filtrar por documento
         observaciones = db.query(Observacion).filter(Observacion.documento == documento) and db.query(Observacion).filter(Observacion.fecha == fecha) .all()
-
-        # Si no se encontraron observaciones, se lanza una excepción
-        if not observaciones:
-            raise HTTPException(status_code=404, detail="No se encontraron observaciones para el documento proporcionadoo.")
-        
         return observaciones
-
     except SQLAlchemyError as e:
         # Si hay un error en la consulta, se lanza una excepción con el mensaje de error
         raise HTTPException(status_code=400, detail=str(e))
