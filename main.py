@@ -472,36 +472,7 @@ async def reservar_clase(datos_reserva: ReservaBase, db: Session = Depends(get_d
 
 
 
-#METODO PARA VER SI EL USUARIO DE PAGO EXISTE
-@app.post('/verificar_pago')
-async def verificar_usuario_pago(datos_cuenta:VerficarUsuario, db:Session=Depends(get_db)):
-    #Obtener datos de la cuenta
-    cuentabd= obtener_datos_cuenta(datos_cuenta.documento, db)
 
-
-    cuenta=db.query(Estudiante).filter(Estudiante.documento==datos_cuenta.documento).first()
-    datos=db.query(Cuenta).filter(Cuenta.documento==datos_cuenta.documento).first()
-
-    if not cuenta:
-        return {f'El documento que ingreso no se encuentra en la base de datos', datos_cuenta.documento}
-    # Crear los datos del token
-    datos_token = {
-        "pagare": cuentabd.pagare,
-        "documento": cuentabd.documento,
-        "saldo": cuentabd.saldo,
-        "pago_minimo": cuentabd.pago_minimo,
-        #Se pone isoformat para que tome la rfecha como un string y no como tipo date
-        "fecha_proximo_pago": cuentabd.fecha_proximo_pago.isoformat(),
-        "dias_mora": cuentabd.dias_mora
-    }
-
-    db.commit()
-    db.refresh(cuenta)
-    # Generar el token JWT 
-    token_acceso = crear_token(datos=datos_token, tiempo_expiracion=timedelta(minutes=MINUTOS_DE_EXPIRACION))
-    return {"access_token": token_acceso, 
-            "token_type": "bearer",
-            "documento": datos_token}
 
 
 
@@ -704,16 +675,11 @@ async def filtro_observaciones_por_documento(documento: str,fecha:str, db: Sessi
    
     
 #METODO PARA TRAER LA INFORMACION DE LA CUENTA
-@app.get("/datos_cuenta")
-async def obtener_cuenta(cuenta : dict =Depends(get_current_count_student)):
-            return {
-                    "Pagare": cuenta.pagare,
-                    "Documento": cuenta.documento,
-                    "Saldo": cuenta.saldo,
-                    "Pago Minimo":cuenta.pago_minimo,
-                    "Fecha del proximo pago": cuenta.fecha_proximo_pago,
-                    "Dias de mora": cuenta.dias_mora
-                    }
+@app.get("/datos_cuenta/{documento}")
+async def obtener_cuenta(documento:str, db:Session=Depends(get_db)):
+    Cuenta_encontrada=db.query(Cuenta).filter(Cuenta.documento==documento).first()
+    return Cuenta_encontrada
+
 
 
 
