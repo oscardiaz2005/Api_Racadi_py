@@ -117,26 +117,6 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     
     return user
 
-#funcion para tener la cuenta del estudiante
-async def get_current_count_student(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITMO])
-        # Obtener el nombre la cuenta  desde el token
-        print(payload)
-        cuenta: str = payload.get("documento")
-        if cuenta is None:
-            raise credentials_exception
-    except JWTError:
-        # Si hay un error en el token o ha expiracion
-        raise credentials_exception
-    
-    #Obtener los mdatos de la cuenta del usuaruio desde la base de datos
-    count= obtener_datos_cuenta(cuenta, db)
-    if count is None:
-        raise credentials_exception
-
-    return count
 
 # Endpoint protegido para obtener el usuario actual
 @app.get("/users/me")
@@ -506,6 +486,17 @@ async def añadir_solicitud(dato_solicitud:SolicitudBase, db:Session=Depends(get
         raise HTTPException(status_code=400 ,detail=f"algo salio mal : {str(e)}")
 
 
+#Metodo para añadir comunicados
+
+@app.post("/comunicados/")
+async def crear_comunicado(titulo: str, descripcion: str, foto: str = None, db: Session = Depends(get_db)):
+    nuevo_comunicado = Comunicado(titulo=titulo, descripcion=descripcion, foto=foto)
+    db.add(nuevo_comunicado)
+    db.commit()
+    db.refresh(nuevo_comunicado)
+    return nuevo_comunicado
+
+
 #-------------------------------------------------------------------------------------------------------------------------            
 #-------------------------------------------------------------------------------------------------------------------------            
 #-------------------------------------------------------------------------------------------------------------------------            
@@ -672,8 +663,36 @@ async def filtro_observaciones_por_documento(documento: str,fecha:str, db: Sessi
         # Si hay un error en la consulta, se lanza una excepción con el mensaje de error
         raise HTTPException(status_code=400, detail=str(e))
     
-   
-    
+
+
+@app.get("/obtenersolicitudestudiante/{documento}")
+async def obtener_solicitudes_estudiante(documento: str, db: Session = Depends(get_db)):
+    try:
+        solicitudes_estudiante = db.query(Solicitud).filter(
+            and_(
+                Solicitud.documento == documento,
+                Solicitud.contestacion == True
+            )
+        ).all()
+
+        resultados = [
+            {
+                "id_solicitud": solicitud.id_solicitud,
+                "descripcion": solicitud.descripcion,
+                "respuesta": solicitud.respuesta,
+                "fecha_creacion": solicitud.fecha_creacion,
+            }
+            for solicitud in solicitudes_estudiante
+        ]
+
+        if resultados:
+            return resultados
+        else:
+            raise HTTPException(status_code=400, detail="No hay solicitudes para el estudiante.")
+
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=400, detail=str(e)) 
+
 #METODO PARA TRAER LA INFORMACION DE LA CUENTA
 @app.get("/datos_cuenta/{documento}")
 async def obtener_cuenta(documento:str, db:Session=Depends(get_db)):
@@ -694,6 +713,21 @@ async def obtener_solicitudes(db:Session=Depends(get_db)):
             return {"message": "No hay solicitudes"}
     except SQLAlchemyError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+
+#Metodo para traer todos los comunicados
+@app.get("/todos_comunicados/")
+async def obtener_comunicados(db: Session = Depends(get_db)):
+    comunicados = db.query(Comunicado).all()
+    try:
+        if comunicados:
+            return comunicados
+        else: 
+            return {"message": "No hay solicitudes"}
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 #-------------------------------------------------------------------------------------------------------------------------            
 #-------------------------------------------------------------------------------------------------------------------------            
 #-------------------------------------------------------------------------------------------------------------------------            
@@ -768,6 +802,18 @@ async def cancelar_reserva(datos_reserva: ReservaBase, db: Session = Depends(get
         raise HTTPException(status_code=400, detail=f"Algo salió mal: {str(e)}")
 
 
+#Metodo para eliminar comunicado
+@app.delete("/comunicados/{id_comunicado}")
+async def eliminar_comunicado(id_comunicado: int, db: Session = Depends(get_db)):
+    comunicado = db.query(Comunicado).filter(Comunicado.id_comunicado == id_comunicado).first()
+    
+    if not comunicado:
+        raise HTTPException(status_code=404, detail="Comunicado no encontrado.")
+    
+    db.delete(comunicado)
+    db.commit()
+    return {"detail": "Comunicado eliminado."}
+
 
 
 
@@ -793,3 +839,41 @@ async def actualizar_solicitud(id: int, solicitud: SolicitudBase, db: Session = 
     })
     db.commit()
     return {"message": "Solicitud actualizada con éxito"}
+
+
+
+@app.put("/actualizar_contestacion/{id_solicitud}")
+async def actualizar_contestacion(id_solicitud: int, db: Session = Depends(get_db)):
+    try:
+        solicitud = db.query(Solicitud).filter(Solicitud.id_solicitud == id_solicitud).first()
+        
+        if not solicitud:
+            raise HTTPException(status_code=404, detail="Solicitud no encontrada.")
+
+        solicitud.contestacion = True
+        solicitud.respuesta = respuesta
+        db.commit()
+
+        return {"detail": "Contestación actualizada a True."}
+
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+#Metodo para actualizar comunicados
+@app.put("/comunicados/{id_comunicado}")
+async def editar_comunicado(id_comunicado: int, titulo: str = None, descripcion: str = None, foto: str = None, db: Session = Depends(get_db)):
+    comunicado = db.query(Comunicado).filter(Comunicado.id_comunicado == id_comunicado).first()
+    
+    if not comunicado:
+        raise HTTPException(status_code=404, detail="Comunicado no encontrado.")
+    
+    if titulo is not None:
+        comunicado.titulo = titulo
+    if descripcion is not None:
+        comunicado.descripcion = descripcion
+    if foto is not None:
+        comunicado.foto = foto
+
+    db.commit()
+    return comunicado
