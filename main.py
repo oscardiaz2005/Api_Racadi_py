@@ -652,7 +652,7 @@ async def filtro_observaciones_por_documento(documento: str, db: Session = Depen
     
     
     
-#Es para mostrar las observaciones del estudinate en la vista estudiante flitrados por fecha
+#Es para mostrar las observaciones del estudiante en la vista estudiante filtrados por fecha
 @app.get("/filtro_ObservadoresFecha/{documento}/{fecha}")
 async def filtro_observaciones_por_documento(documento: str,fecha:str, db: Session = Depends(get_db)):
     try:
@@ -664,7 +664,7 @@ async def filtro_observaciones_por_documento(documento: str,fecha:str, db: Sessi
         raise HTTPException(status_code=400, detail=str(e))
     
 
-
+#Metodo para tener solicitudes del estudiante por documento y contestadas
 @app.get("/obtenersolicitudestudiante/{documento}")
 async def obtener_solicitudes_estudiante(documento: str, db: Session = Depends(get_db)):
     try:
@@ -678,6 +678,7 @@ async def obtener_solicitudes_estudiante(documento: str, db: Session = Depends(g
         resultados = [
             {
                 "id_solicitud": solicitud.id_solicitud,
+                "documento": solicitud.documento,
                 "descripcion": solicitud.descripcion,
                 "respuesta": solicitud.respuesta,
                 "fecha_creacion": solicitud.fecha_creacion,
@@ -713,6 +714,36 @@ async def obtener_solicitudes(db:Session=Depends(get_db)):
             return {"message": "No hay solicitudes"}
     except SQLAlchemyError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+#METODO PARA TRAER LA INFORMACION DE LAS SOLICITUDES POR ESTUDIANTE
+@app.get("/traer_datos_solicitudes/{documento}")
+async def obtener_solicitudes(documento: str, db:Session=Depends(get_db)):
+    try:
+        solicitudes_estudiante = db.query(Solicitud).filter(
+            and_(
+                Solicitud.documento == documento,
+                Solicitud.contestacion == False
+            )
+        ).all()
+
+        resultados = [
+            {
+                "id_solicitud": solicitud.id_solicitud,
+                "descripcion": solicitud.descripcion,
+                "respuesta": solicitud.respuesta,
+                "fecha_creacion": solicitud.fecha_creacion,
+            }
+            for solicitud in solicitudes_estudiante
+        ]
+
+        if resultados:
+            return resultados
+        else:
+            raise HTTPException(status_code=400, detail="No hay solicitudes para el estudiante.")
+
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=400, detail=str(e)) 
 
 
 
@@ -841,23 +872,22 @@ async def actualizar_solicitud(id: int, solicitud: SolicitudBase, db: Session = 
     return {"message": "Solicitud actualizada con éxito"}
 
 
+#METODO PARA AÑADIR LA CONTESTACION
+@app.put("/actualizar_contestacion/{id_solicitud}/{documento}/{respuesta}")
+async def actualizar_contestacion(id_solicitud: int, documento: str, respuesta: str, db: Session = Depends(get_db)):
+    solicitud = db.query(Solicitud).filter(Solicitud.id_solicitud == id_solicitud).first()
+    
+    if not solicitud:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada.")
 
-@app.put("/actualizar_contestacion/{id_solicitud}")
-async def actualizar_contestacion(id_solicitud: int, db: Session = Depends(get_db)):
-    try:
-        solicitud = db.query(Solicitud).filter(Solicitud.id_solicitud == id_solicitud).first()
-        
-        if not solicitud:
-            raise HTTPException(status_code=404, detail="Solicitud no encontrada.")
+    # Actualizar los campos
+    solicitud.contestacion = True
+    solicitud.respuesta = respuesta  # Asegúrate de que 'respuesta' esté definido
+    solicitud.documento = documento
 
-        solicitud.contestacion = True
-        solicitud.respuesta = respuesta
-        db.commit()
-
-        return {"detail": "Contestación actualizada a True."}
-
-    except SQLAlchemyError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    db.commit()
+    
+    return {"message": "Contestación actualizada con éxito"}
 
 
 #Metodo para actualizar comunicados
