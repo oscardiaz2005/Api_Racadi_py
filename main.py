@@ -17,15 +17,19 @@ from funciones_crear_cuenta import *
 from funciones_validacion_clases import *
 from typing import List
 
-
+from fastapi import FastAPI, APIRouter
 # DOCUMENTEN EL CODIGO (COMENTAR) PARA QUE NO SE HAGA UN SANCOCHO XFA
 
 
 #inicializar la app
 app=FastAPI()
+<<<<<<< HEAD
 
 app.mount("/images", StaticFiles(directory="micarpetaimg"), name="images")
 
+=======
+router = APIRouter()
+>>>>>>> sebas
 
 #PERMITIR EL USO DE LA API
 app.add_middleware(
@@ -806,6 +810,58 @@ async def obtener_comunicados(db: Session = Depends(get_db)):
             return {"message": "No hay solicitudes"}
     except SQLAlchemyError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    
+    
+    #metodo get para traer las clases reservadas
+@app.get("/clases_reservadas/{documento_estudiante}")
+async def obtener_reservas(documento_estudiante: str, db: Session = Depends(get_db)):
+    try:
+        # Realiza la consulta a la base de datos para filtrar por documento_estudiante
+        reservas = db.query(Reserva, Clase)\
+            .join(Clase)\
+            .filter(Reserva.documento_estudiante == documento_estudiante)\
+            .all()
+
+        # Formatea la respuesta
+        result = []
+        for reserva, clase in reservas:
+            result.append({
+                'id_reserva': reserva.id_reserva,
+                'id_clase': clase.id_clase,
+                'sede': clase.sede,
+                'nivel': clase.nivel,
+                'hora_inicio': str(clase.hora_inicio),  # Convertir Time a string
+                'hora_fin': str(clase.hora_fin),        # Convertir Time a string
+                'fecha': str(clase.fecha),              # Convertir Date a string
+                'documento_profesor':get_name_teacher_by_dni(clase.documento_profesor,db) ,
+                'documento_estudiante': reserva.documento_estudiante,
+                'cupos': clase.cupos
+            })
+
+        return result
+
+    except SQLAlchemyError as e:
+        # Si hay un error en la consulta, se lanza una excepción con el mensaje de error
+        return {"message": "No hay clases reservadas"}
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    
+    
+
+##filtrar las clases por documento de profesor
+@app.get("/filtro_ClasesDocumento/{documento}")
+async def filtro_Clases_por_documento(documento: str, db: Session = Depends(get_db)):
+    try:
+        # Realiza la consulta a la base de datos para filtrar por documento
+        Clases = db.query(Clase).filter(Clase.documento_profesor == documento).all()
+
+        return Clases
+
+    except SQLAlchemyError as e:
+        # Si hay un error en la consulta, se lanza una excepción con el mensaje de error
+        raise HTTPException(status_code=400, detail=str(e))
+         
 
 #-------------------------------------------------------------------------------------------------------------------------            
 #-------------------------------------------------------------------------------------------------------------------------            
