@@ -1,4 +1,6 @@
-from fastapi import FastAPI ,HTTPException,Depends,status
+import os
+from fastapi import FastAPI ,HTTPException,Depends,status ,Form ,File ,UploadFile
+from fastapi.staticfiles import StaticFiles
 from conexion import crear,get_db
 from modelo import *
 from sqlalchemy.orm import Session 
@@ -21,6 +23,8 @@ from typing import List
 
 #inicializar la app
 app=FastAPI()
+
+app.mount("/images", StaticFiles(directory="micarpetaimg"), name="images")
 
 
 #PERMITIR EL USO DE LA API
@@ -208,29 +212,73 @@ async def add_admin(datos_administador:AdministradorBase , db: Session =Depends(
 
 
 @app.post("/añadirestudiante")
-async def añadir_estudiante(datos_estudiante: EstudianteBase, db: Session = Depends(get_db)):
-    existe_documento = db.query(Estudiante).filter(Estudiante.documento == datos_estudiante.documento).first()
+async def añadir_estudiante(
+    documento: str = Form(...),
+    tipo_de_documento: str = Form(...),
+    nombre: str = Form(...),
+    apellido: str = Form(...),
+    fecha_nacimiento: str = Form(...),
+    genero: str = Form(...),
+    celular: str = Form(...),
+    correo: str = Form(...),
+    direccion: str = Form(...),
+    sede: str = Form(...),
+    usuario: str = Form(...),
+    contraseña: str = Form(...),
+    nivel_actual: str = Form(...),
+    plan: str = Form(...),
+    file: UploadFile = File(...),  # Añadido para el archivo de imagen
+    db: Session = Depends(get_db)
+):
+    # Validación de documento y usuario
+    existe_documento = db.query(Estudiante).filter(Estudiante.documento == documento).first()
     if existe_documento:
-        raise HTTPException(status_code=400, detail=f"El documento '{datos_estudiante.documento}' ya está en uso.")
-
-    if usuario_existe_globalmente(datos_estudiante.usuario, db):
-        raise HTTPException(status_code=400, detail=f"El usuario '{datos_estudiante.usuario}' ya está en uso.")
-
-    if not verificar_contraseña(datos_estudiante.contraseña):
+        raise HTTPException(status_code=400, detail=f"El documento '{documento}' ya está en uso.")
+    
+    if usuario_existe_globalmente(usuario, db):
+        raise HTTPException(status_code=400, detail=f"El usuario '{usuario}' ya está en uso.")
+    
+    if not verificar_contraseña(contraseña):
         raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres, incluyendo números, caracteres especiales y mayúsculas.")
     
-    if not verify_cel(datos_estudiante.celular):
-        raise HTTPException(status_code=400, detail="Numero de Celular Invalido , no cumple con el estandar de 10 digitos")
+    if not verify_cel(celular):
+        raise HTTPException(status_code=400, detail="Número de celular inválido, debe tener 10 dígitos.")
 
 
+    if file.content_type not in ["image/jpeg", "image/png"]:
+        raise HTTPException(status_code=400, detail="Formato de archivo no soportado")
+    
+    folder_path = "micarpetaimg"
+    file_location = os.path.join(folder_path, file.filename)
 
+    # Asegúrate de que la carpeta existe
+    os.makedirs(folder_path, exist_ok=True)
+
+    # Guarda el archivo en el servidor
+    with open(file_location, "wb") as buffer:
+        buffer.write(await file.read())
+
+
+    foto_perfil_url = f"/images/{file.filename}"
+
+    
+    # Crea el nuevo estudiante
     nuevo_estudiante = Estudiante(
-        documento=datos_estudiante.documento,tipo_de_documento=datos_estudiante.tipo_de_documento,nombre=datos_estudiante.nombre,
-        apellido=datos_estudiante.apellido,fecha_nacimiento=datos_estudiante.fecha_nacimiento,genero=datos_estudiante.genero,
-        celular=datos_estudiante.celular,correo=datos_estudiante.correo,direccion=datos_estudiante.direccion,
-        sede=datos_estudiante.sede,usuario=datos_estudiante.usuario,contraseña=encriptar_contraseña(datos_estudiante.contraseña),
-        nivel_actual=datos_estudiante.nivel_actual,
-        fecha_inscripcion=datos_estudiante.fecha_inscripcion,plan=datos_estudiante.plan,foto_perfil=datos_estudiante.foto_perfil
+        documento=documento,
+        tipo_de_documento=tipo_de_documento,
+        nombre=nombre,
+        apellido=apellido,
+        fecha_nacimiento=fecha_nacimiento,
+        genero=genero,
+        celular=celular,
+        correo=correo,
+        direccion=direccion,
+        sede=sede,
+        usuario=usuario,
+        contraseña=encriptar_contraseña(contraseña),
+        nivel_actual=nivel_actual,
+        plan=plan,
+        foto_perfil=foto_perfil_url  # Ruta de la imagen guardada
     )
 
     try:
@@ -238,6 +286,7 @@ async def añadir_estudiante(datos_estudiante: EstudianteBase, db: Session = Dep
         db.commit()
         db.refresh(nuevo_estudiante)
         
+        # Crea la cuenta asociada al estudiante
         nueva_cuenta = Cuenta(
             documento=nuevo_estudiante.documento,
             saldo=obtener_saldo(nuevo_estudiante.plan, db),
@@ -252,7 +301,6 @@ async def añadir_estudiante(datos_estudiante: EstudianteBase, db: Session = Dep
     except SQLAlchemyError as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Algo salió mal: {str(e)}")
-
 
 
 #METODO PARA AÑADIR PROFESORES
