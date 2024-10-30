@@ -64,7 +64,7 @@ class RegistroEstudianteNivelBase(BaseModel):
 
 class ClaseBase(BaseModel):
     id_clase: Optional[int]=None 
-    sede: Literal['madrid', 'mosquera', 'funza', 'faca', 'bogota']
+    sede: Literal['madrid', 'mosquera', 'funza', 'facatativa', 'bogota']
     nivel: Literal['beginner', 'basic 1', 'basic 2', 'intermediate', 'advanced']
     hora_inicio: time 
     hora_fin: time 
@@ -73,9 +73,12 @@ class ClaseBase(BaseModel):
     cupos: int
     administrador: Optional[int] = None
 
+class VerficarUsuario(BaseModel):
+    tipo_de_documento: Literal['cedula','cedula extranjera','tarjeda de identidad']
+    documento: str
+
 
 class ReservaBase(BaseModel):
-    id_reserva: Optional [int] = None
     id_clase: int
     documento_estudiante: str
 
@@ -101,6 +104,7 @@ class PlanBase(BaseModel):
 
 
 class CuentaBase(BaseModel):
+    pagare: Optional [int] = None
     documento: str
     saldo: int
     pago_minimo: int
