@@ -813,7 +813,7 @@ async def obtener_reservas(documento_estudiante: str, db: Session = Depends(get_
 
     except SQLAlchemyError as e:
         # Si hay un error en la consulta, se lanza una excepción con el mensaje de error
-        return {"message": "No hay clases reservadas"}
+        return {"message": "No hay clases Reservadas"}
     except SQLAlchemyError as e:
         raise HTTPException(status_code=400, detail=str(e))
     
