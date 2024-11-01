@@ -138,3 +138,9 @@ def crear_token(datos: dict, tiempo_expiracion: timedelta = None):
 def get_name_teacher_by_dni(documento:str , db:Session):
     P=db.query(Profesor).filter(Profesor.documento==documento).first()
     return f"{P.nombre} {P.apellido}"
+
+ 
+
+    
+
+
