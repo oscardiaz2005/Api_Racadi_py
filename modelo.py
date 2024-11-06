@@ -68,9 +68,10 @@ class RegistroEstudianteNivel(base):
     aprobacion = Column(Boolean, nullable=True)
 
     # Función para calcular automáticamente la nota de evaluación
-    def calcular_nota_evaluacion(self):
-        self.nota_evaluacion = (self.speaking + self.listening + self.reading + self.writing) / 4.0
-        self.aprobacion = self.nota_evaluacion >= 3.0
+    @staticmethod
+    def calcular_nota_evaluacion(mapper, connection, target):
+        target.nota_evaluacion = (target.speaking + target.listening + target.reading + target.writing) / 4.0
+        target.aprobacion = target.nota_evaluacion >= 3.0
 
 
 # Evento para calcular la nota antes de insertar o actualizar el registro

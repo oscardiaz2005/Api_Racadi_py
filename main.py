@@ -229,7 +229,7 @@ async def añadir_estudiante(
     contraseña: str = Form(...),
     nivel_actual: str = Form(...),
     plan: str = Form(...),
-    file: UploadFile = File(...),  # Añadido para el archivo de imagen
+    file: UploadFile = File(...),  
     db: Session = Depends(get_db)
 ):
     # Validación de documento y usuario
@@ -306,34 +306,77 @@ async def añadir_estudiante(
         raise HTTPException(status_code=400, detail=f"Algo salió mal: {str(e)}")
 
 
+
 #METODO PARA AÑADIR PROFESORES
 @app.post("/añadirprofesor")
-async def añadir_profesor(datos_profesor:ProfesorBase, db: Session =Depends(get_db)):
-    existe_documento=db.query(Profesor).filter(Profesor.documento==datos_profesor.documento).first()
+async def añadir_estudiante(
+    documento: str = Form(...),
+    tipo_de_documento: str = Form(...),
+    nombre: str = Form(...),
+    apellido: str = Form(...),
+    fecha_nacimiento: str = Form(...),
+    genero: str = Form(...),
+    celular: str = Form(...),
+    correo: str = Form(...),
+    direccion: str = Form(...),
+    usuario: str = Form(...),
+    contraseña: str = Form(...),
+    file: UploadFile = File(...),  
+    db: Session = Depends(get_db)
+):
+    # Validación de documento y usuario
+    existe_documento = db.query(Profesor).filter(Profesor.documento == documento).first()
     if existe_documento:
-        raise HTTPException (status_code=400, detail=f"el documento '{datos_profesor.documento}' ya esta en uso ") 
-          
-    if usuario_existe_globalmente(datos_profesor.usuario, db):
-        raise HTTPException(status_code=400, detail=f"El usuario '{datos_profesor.usuario}' ya está en uso ")  
+        raise HTTPException(status_code=400, detail=f"El documento '{documento}' ya está en uso.")
     
-    if not verificar_contraseña(datos_profesor.contraseña):
-        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres , incluyendo números , caracteres especiales y  mayusculas")
+    if usuario_existe_globalmente(usuario, db):
+        raise HTTPException(status_code=400, detail=f"El usuario '{usuario}' ya está en uso.")
     
+    if not verificar_contraseña(contraseña):
+        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres, incluyendo números, caracteres especiales y mayúsculas.")
+    
+    if not verify_cel(celular):
+        raise HTTPException(status_code=400, detail="Número de celular inválido, debe tener 10 dígitos.")
+
+
+    if file.content_type not in ["image/jpeg", "image/png"]:
+        raise HTTPException(status_code=400, detail="Formato de archivo no soportado")
+    
+    folder_path = "micarpetaimg"
+    file_location = os.path.join(folder_path, file.filename)
+
+    # Asegúrate de que la carpeta existe
+    os.makedirs(folder_path, exist_ok=True)
+
+    # Guarda el archivo en el servidor
+    with open(file_location, "wb") as buffer:
+        buffer.write(await file.read())
+
+
+    foto_perfil_url = f"/images/{file.filename}"
+
+    
+    # Crea el nuevo Profesor
     nuevo_profesor = Profesor(
-        documento=datos_profesor.documento,tipo_de_documento=datos_profesor.tipo_de_documento,nombre=datos_profesor.nombre,
-        apellido=datos_profesor.apellido,fecha_nacimiento=datos_profesor.fecha_nacimiento,genero=datos_profesor.genero,
-        celular=datos_profesor.celular,correo=datos_profesor.correo,direccion=datos_profesor.direccion,
-        usuario=datos_profesor.usuario,contraseña=encriptar_contraseña(datos_profesor.contraseña),
-        fecha_contratacion=datos_profesor.fecha_contratacion,foto_perfil=datos_profesor.foto_perfil
+        documento=documento,
+        tipo_de_documento=tipo_de_documento,
+        nombre=nombre,
+        apellido=apellido,
+        fecha_nacimiento=fecha_nacimiento,
+        genero=genero,
+        celular=celular,
+        correo=correo,
+        direccion=direccion,
+        usuario=usuario,
+        contraseña=encriptar_contraseña(contraseña),
+        foto_perfil=foto_perfil_url  # Ruta de la imagen guardada
     )
 
-
-    
     try:
         db.add(nuevo_profesor)
         db.commit()
         db.refresh(nuevo_profesor)
-        return "Profesor agregado exitosamente"
+        
     except SQLAlchemyError as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Algo salió mal: {str(e)}")
@@ -534,15 +577,78 @@ async def añadir_solicitud(dato_solicitud:SolicitudBase, db:Session=Depends(get
         raise HTTPException(status_code=400 ,detail=f"algo salio mal : {str(e)}")
 
 
+
 #Metodo para añadir comunicados
 
-@app.post("/comunicados/")
-async def crear_comunicado(titulo: str, descripcion: str, foto: str = None, db: Session = Depends(get_db)):
-    nuevo_comunicado = Comunicado(titulo=titulo, descripcion=descripcion, foto=foto)
-    db.add(nuevo_comunicado)
-    db.commit()
-    db.refresh(nuevo_comunicado)
-    return nuevo_comunicado
+
+@app.post("/crear_comunicados")
+async def crear_comunicado(
+    titulo: str = Form(...),descripcion: str = Form(...),file: UploadFile = File(...),  db:Session=Depends(get_db)):
+
+
+    if file.content_type not in ["image/jpeg", "image/png"]:
+        raise HTTPException(status_code=400, detail="Formato de archivo no soportado")
+    
+    folder_path = "micarpetaimg"
+    file_location = os.path.join(folder_path, file.filename)
+
+    # Asegúrate de que la carpeta existe
+    os.makedirs(folder_path, exist_ok=True)
+
+    # Guarda el archivo en el servidor
+    with open(file_location, "wb") as buffer:
+        buffer.write(await file.read())
+
+
+    foto_comunicado_url = f"/images/{file.filename}"
+
+    nuevo_comunicado=Comunicado(
+        titulo=titulo,
+        descripcion=descripcion,
+        foto=foto_comunicado_url
+    )
+    try:
+        db.add(nuevo_comunicado)
+        db.commit()
+        db.refresh(nuevo_comunicado)
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=400 ,detail=f"algo salio mal : {str(e)}")
+
+
+    
+
+
+#METODO PARA AÑADIR LAS NOTAS DE EVALUACION
+
+
+@app.post("/add_notas")
+async def add_quiz_results(documento:str,speaking:float,listening:float,reading:float,writing:float,db:Session= Depends(get_db)):
+    verify_notes(speaking,listening,reading,writing)
+    validar_estudiante(documento,db)
+    validar_nivel_estudiante(documento,db)
+    borrar_registro_fallido(documento,get_student_level(documento,db),db)
+    nuevo_registro=RegistroEstudianteNivel(
+        documento=documento,
+        nivel=get_student_level(documento,db),
+        speaking=speaking,
+        listening=listening,
+        reading=reading,
+        writing=writing
+    )
+    try:
+        db.add(nuevo_registro)
+        db.commit()
+        db.refresh(nuevo_registro)
+
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=400 ,detail=f"algo salio mal : {str(e)}")
+    set_next_level(documento,db)         
+    
+
+
+           
+    
 
 
 #-------------------------------------------------------------------------------------------------------------------------            
@@ -615,6 +721,33 @@ async def buscar_profesores(nombre: str, db: Session = Depends(get_db)):
     ]
     
     return resultados
+
+
+#METODO PARA BUSQUEDA REACTIVA DE Estudiantes POR NOMBRE
+@app.get("/buscarestudiantes", response_model=List[dict])
+async def buscar_estudiantes(nombre: str, db: Session = Depends(get_db)):
+    # Filtra los profesores directamente en la consulta
+    estudiantes = db.query(Estudiante).filter(
+        or_(
+            Estudiante.nombre.ilike(f"%{nombre}%"),  # Búsqueda insensible a mayúsculas/minúsculas
+            Estudiante.apellido.ilike(f"%{nombre}%")
+        )
+    ).all()
+
+    resultados = [
+        {
+            "documento": estudiante.documento,
+            "nombre": estudiante.nombre,
+            "apellido": estudiante.apellido,
+            "nivel_actual": estudiante.nivel_actual
+        }
+        for estudiante in estudiantes
+    ]
+    
+    return resultados
+
+
+
 
 ## METODO PARA CONSULTAR EL NOMBRE DE LOS PLANES
 @app.get("/obtenernombreplanes")
@@ -796,16 +929,78 @@ async def obtener_solicitudes(documento: str, db:Session=Depends(get_db)):
 
 
 #Metodo para traer todos los comunicados
-@app.get("/todos_comunicados/")
-async def obtener_comunicados(db: Session = Depends(get_db)):
-    comunicados = db.query(Comunicado).all()
+@app.get("/obtener_comunicados")
+async def get_comunicados(db: Session = Depends(get_db)):
     try:
-        if comunicados:
-            return comunicados
-        else: 
-            return {"message": "No hay solicitudes"}
+        comunicados = db.query(Comunicado).all()  # Obtener  todos los comunicados
+        return comunicados  # retornar los comunicaos,claramente no?
+
     except SQLAlchemyError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    
+    
+    
+    #metodo get para traer las clases reservadas
+@app.get("/clases_reservadas/{documento_estudiante}")
+async def obtener_reservas(documento_estudiante: str, db: Session = Depends(get_db)):
+    try:
+        # Realiza la consulta a la base de datos para filtrar por documento_estudiante
+        reservas = db.query(Reserva, Clase)\
+            .join(Clase)\
+            .filter(Reserva.documento_estudiante == documento_estudiante)\
+            .all()
+
+        # Formatea la respuesta
+        result = []
+        for reserva, clase in reservas:
+            result.append({
+                'id_reserva': reserva.id_reserva,
+                'id_clase': clase.id_clase,
+                'sede': clase.sede,
+                'nivel': clase.nivel,
+                'hora_inicio': str(clase.hora_inicio),  # Convertir Time a string
+                'hora_fin': str(clase.hora_fin),        # Convertir Time a string
+                'fecha': str(clase.fecha),              # Convertir Date a string
+                'documento_profesor':get_name_teacher_by_dni(clase.documento_profesor,db) ,
+                'documento_estudiante': reserva.documento_estudiante,
+                'cupos': clase.cupos
+            })
+
+        return result
+
+    except SQLAlchemyError as e:
+        # Si hay un error en la consulta, se lanza una excepción con el mensaje de error
+        return {"message": "No hay clases Reservadas"}
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    
+    
+
+##filtrar las clases por documento de profesor
+@app.get("/filtro_ClasesDocumento/{documento}")
+async def filtro_Clases_por_documento(documento: str, db: Session = Depends(get_db)):
+    try:
+        # Realiza la consulta a la base de datos para filtrar por documento
+        Clases = db.query(Clase).filter(Clase.documento_profesor == documento).all()
+        result=[]
+        for clase in Clases:
+            result.append({
+                'sede': clase.sede,
+                'nivel': clase.nivel,
+                'hora_inicio': str(clase.hora_inicio),  # Convertir Time a string
+                'hora_fin': str(clase.hora_fin),        # Convertir Time a string
+                'fecha': str(clase.fecha),              # Convertir Date a string
+                'documento_profesor':get_name_teacher_by_dni(clase.documento_profesor,db) ,
+                'estudiantes': count_students(clase.id_clase,db)
+            })
+
+        return result 
+
+    except SQLAlchemyError as e:
+        # Si hay un error en la consulta, se lanza una excepción con el mensaje de error
+        raise HTTPException(status_code=400, detail=str(e))
+         
 
 #-------------------------------------------------------------------------------------------------------------------------            
 #-------------------------------------------------------------------------------------------------------------------------            
@@ -825,6 +1020,8 @@ async def delete_estudiante(documento:str,db:Session=Depends(get_db)):
         return {"":f"estudiante con documento {documento} eliminado"}
     else:
         raise HTTPException (status_code=400, detail="no se encontro estudiante")
+
+
 
 
 
@@ -955,3 +1152,5 @@ async def editar_comunicado(id_comunicado: int, titulo: str = None, descripcion:
 
     db.commit()
     return comunicado
+
+
