@@ -141,6 +141,11 @@ def get_name_teacher_by_dni(documento:str , db:Session):
     P=db.query(Profesor).filter(Profesor.documento==documento).first()
     return f"{P.nombre} {P.apellido}"
 
+#OBTENER NOMBRE Y APELIIDO DE ESTUDIANTE POR DOCUMENTO 
+def get_name_student_by_dni(documento:str , db:Session):
+    S=db.query(Estudiante).filter(Estudiante.documento==documento).first()
+    return f"{S.nombre} {S.apellido}"
+
  
 #FUNCION PARA CONTAR CUANTOS ESTUDIANTES HAN RESERVADO UNA CLASE
 def count_students(id_clase:int , db :Session):
@@ -192,7 +197,31 @@ def set_next_level(documento:str,db:Session):
         elif estudiante.nivel_actual=="intermediate":
             estudiante.nivel_actual="advanced"  
     db.commit()
-    db.refresh(estudiante)            
+    db.refresh(estudiante)
+    
+
+def make_quiz_observation(documento:str,db:Session):
+    observation=""
+    estudiante=db.query(Estudiante).filter(documento == Estudiante.documento).first()
+    nivel_actual=estudiante.nivel_actual
+    registro_de_nivel=db.query(RegistroEstudianteNivel).filter( and_(documento==RegistroEstudianteNivel.documento,nivel_actual==RegistroEstudianteNivel.nivel )  ).first()
+    if registro_de_nivel.aprobacion==True:
+        observation="son los requeridos para ser promovido"
+    else :
+        observation="no son los requeridos para ser promovido"
+
+    nueva_observacion = Observacion(
+        descripcion=f"El estudiante {estudiante.nombre} {estudiante.apellido} presenta examen de cambio de nivel, los resultados {observation}",
+        documento=estudiante.documento,
+        creada_por="Administracion" ) 
+    db.add(nueva_observacion)
+    db.commit()
+    db.refresh(nueva_observacion)   
+
+
+
+
+
 
 
 

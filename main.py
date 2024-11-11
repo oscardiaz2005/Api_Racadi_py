@@ -16,6 +16,8 @@ from funciones import *
 from funciones_crear_cuenta import *
 from funciones_validacion_clases import *
 from typing import List
+from sqlalchemy.orm import joinedload
+
 
 
 # DOCUMENTEN EL CODIGO (COMENTAR) PARA QUE NO SE HAGA UN SANCOCHO XFA
@@ -616,14 +618,13 @@ async def crear_comunicado(
         raise HTTPException(status_code=400 ,detail=f"algo salio mal : {str(e)}")
 
 
-    
 
 
 #METODO PARA AÑADIR LAS NOTAS DE EVALUACION
 
 
 @app.post("/add_notas")
-async def add_quiz_results(documento:str,speaking:float,listening:float,reading:float,writing:float,db:Session= Depends(get_db)):
+async def add_quiz_results(documento:str,speaking:float,listening:float,reading:float,writing:float,grammar:float,db:Session= Depends(get_db)):
     verify_notes(speaking,listening,reading,writing)
     validar_estudiante(documento,db)
     validar_nivel_estudiante(documento,db)
@@ -634,7 +635,8 @@ async def add_quiz_results(documento:str,speaking:float,listening:float,reading:
         speaking=speaking,
         listening=listening,
         reading=reading,
-        writing=writing
+        writing=writing,
+        grammar=grammar
     )
     try:
         db.add(nuevo_registro)
@@ -643,9 +645,42 @@ async def add_quiz_results(documento:str,speaking:float,listening:float,reading:
 
     except SQLAlchemyError as e:
         raise HTTPException(status_code=400 ,detail=f"algo salio mal : {str(e)}")
-    set_next_level(documento,db)         
+    make_quiz_observation(documento,db)
+    set_next_level(documento,db)   
+      
     
 
+
+
+## METODOS DE ASISTENCIA
+@app.post("/asistencia/{id_reserva:int}")
+async def asistencia(id_reserva:int , db:Session=Depends(get_db) ) :
+    asistencia=Asistencia(
+        id_reserva=id_reserva,
+        asistencia=True
+    )
+      
+    try: 
+        db.add(asistencia)
+        db.commit()
+        db.refresh(asistencia)
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=400 ,detail=f"algo salio mal : {str(e)}")   
+    
+
+@app.post("/incumplimiento/{id_reserva:int}")
+async def asistencia(id_reserva:int , db:Session=Depends(get_db) ) :
+    asistencia=Asistencia(
+        id_reserva=id_reserva,
+        asistencia=False
+    )
+      
+    try: 
+        db.add(asistencia)
+        db.commit()
+        db.refresh(asistencia)
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=400 ,detail=f"algo salio mal : {str(e)}")       
 
            
     
@@ -986,6 +1021,7 @@ async def filtro_Clases_por_documento(documento: str, db: Session = Depends(get_
         result=[]
         for clase in Clases:
             result.append({
+                'id_clase': clase.id_clase,
                 'sede': clase.sede,
                 'nivel': clase.nivel,
                 'hora_inicio': str(clase.hora_inicio),  # Convertir Time a string
@@ -1001,6 +1037,69 @@ async def filtro_Clases_por_documento(documento: str, db: Session = Depends(get_
         # Si hay un error en la consulta, se lanza una excepción con el mensaje de error
         raise HTTPException(status_code=400, detail=str(e))
          
+
+#METODO PARA OBTENER TODOS LOS ESTUDIANTES DE UNA CLASE / ASISTENCIA
+
+@app.get("/getStudentsByClass/{id_clase}")
+async def getStudentsByClass(id_clase: int, db: Session = Depends(get_db)):
+    try:
+        estudiantes_encontrados = db.query( Estudiante,Reserva,Clase,Asistencia.asistencia  ).join(
+            Reserva, Reserva.documento_estudiante == Estudiante.documento).join(
+            Clase, Reserva.id_clase == Clase.id_clase).outerjoin(
+            Asistencia, Reserva.id_reserva == Asistencia.id_reserva  ).filter(
+            Clase.id_clase == id_clase).all()
+        
+        result = []
+        for estudiante, reserva, clase, asistencia in estudiantes_encontrados:
+            result.append({
+                'documento': estudiante.documento,
+                'nombre': estudiante.nombre,
+                'apellido': estudiante.apellido,
+                "id_reserva": reserva.id_reserva,
+                'sede': clase.sede,
+                'nivel': clase.nivel,
+                'hora_inicio': str(clase.hora_inicio),  
+                'hora_fin': str(clase.hora_fin),
+                'fecha': str(clase.fecha),
+                'asistencia': asistencia 
+            })
+
+        return result
+
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+
+#METODO PARA OBTENER LAS NOTAS DE LOS ESTUDIANTE
+
+@app.get("/getStudentsNotes/{nivel}/{documento}")
+async def getStudentsNotes(nivel: str,documento:str, db: Session = Depends(get_db)):
+    try:
+        notas_encontradas=db.query(RegistroEstudianteNivel).filter(
+            and_(
+                RegistroEstudianteNivel.documento==documento,
+                RegistroEstudianteNivel.nivel==nivel)).first()
+        if notas_encontradas:
+            return notas_encontradas
+        else:
+            return None               
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=400, detail=str(e))        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #-------------------------------------------------------------------------------------------------------------------------            
 #-------------------------------------------------------------------------------------------------------------------------            

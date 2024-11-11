@@ -58,6 +58,7 @@ class RegistroEstudianteNivelBase(BaseModel):
     listening: float
     reading: float
     writing: float
+    grammar: float
     nota_evaluacion: Optional[float] = None
     aprobacion: Optional[bool] = None 
 

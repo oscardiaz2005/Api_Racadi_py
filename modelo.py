@@ -64,13 +64,14 @@ class RegistroEstudianteNivel(base):
     listening = Column(Float, nullable=False)
     reading = Column(Float, nullable=False)
     writing = Column(Float, nullable=False)
+    grammar = Column(Float, nullable=False)
     nota_evaluacion = Column(Float, nullable=True)
     aprobacion = Column(Boolean, nullable=True)
 
     # Función para calcular automáticamente la nota de evaluación
     @staticmethod
     def calcular_nota_evaluacion(mapper, connection, target):
-        target.nota_evaluacion = (target.speaking + target.listening + target.reading + target.writing) / 4.0
+        target.nota_evaluacion = (target.speaking + target.listening + target.reading + target.writing +  target.grammar) / 5.0
         target.aprobacion = target.nota_evaluacion >= 3.0
 
 
