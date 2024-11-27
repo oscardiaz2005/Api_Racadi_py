@@ -64,13 +64,15 @@ class RegistroEstudianteNivel(base):
     listening = Column(Float, nullable=False)
     reading = Column(Float, nullable=False)
     writing = Column(Float, nullable=False)
+    grammar = Column(Float, nullable=False)
     nota_evaluacion = Column(Float, nullable=True)
     aprobacion = Column(Boolean, nullable=True)
 
     # Función para calcular automáticamente la nota de evaluación
-    def calcular_nota_evaluacion(self):
-        self.nota_evaluacion = (self.speaking + self.listening + self.reading + self.writing) / 4.0
-        self.aprobacion = self.nota_evaluacion >= 3.0
+    @staticmethod
+    def calcular_nota_evaluacion(mapper, connection, target):
+        target.nota_evaluacion = (target.speaking + target.listening + target.reading + target.writing +  target.grammar) / 5.0
+        target.aprobacion = target.nota_evaluacion >= 3.0
 
 
 # Evento para calcular la nota antes de insertar o actualizar el registro
@@ -129,10 +131,8 @@ class Cuenta(base):
     saldo = Column(Integer, nullable=False)
     pago_minimo = Column(Integer, nullable=False)
     fecha_proximo_pago = Column(Date, nullable=False)
-
     dias_mora = Column(Integer, default=0)
 
-    dias_mora = Column(Integer,default=0)
 
 
     

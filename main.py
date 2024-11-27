@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 from schemas import *
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import text , or_ , and_
+from sqlalchemy import text , or_ , and_ ,desc,asc
 #si no les agarra descarguen esto 'pip install fastapi uvicorn python-jose[cryptography] passlib'
 from jose import JWTError,jwt
 from datetime import datetime,timedelta
@@ -16,6 +16,8 @@ from funciones import *
 from funciones_crear_cuenta import *
 from funciones_validacion_clases import *
 from typing import List
+from sqlalchemy.orm import joinedload
+
 
 
 # DOCUMENTEN EL CODIGO (COMENTAR) PARA QUE NO SE HAGA UN SANCOCHO XFA
@@ -229,7 +231,7 @@ async def añadir_estudiante(
     contraseña: str = Form(...),
     nivel_actual: str = Form(...),
     plan: str = Form(...),
-    file: UploadFile = File(...),  # Añadido para el archivo de imagen
+    file: UploadFile = File(None),  
     db: Session = Depends(get_db)
 ):
     # Validación de documento y usuario
@@ -246,22 +248,25 @@ async def añadir_estudiante(
     if not verify_cel(celular):
         raise HTTPException(status_code=400, detail="Número de celular inválido, debe tener 10 dígitos.")
 
-
-    if file.content_type not in ["image/jpeg", "image/png"]:
-        raise HTTPException(status_code=400, detail="Formato de archivo no soportado")
     
-    folder_path = "micarpetaimg"
-    file_location = os.path.join(folder_path, file.filename)
+    if file:
+        if file.content_type not in ["image/jpeg", "image/png"]:
+            raise HTTPException(status_code=400, detail="Formato de archivo no soportado")
+        
+        folder_path = "micarpetaimg"
+        file_location = os.path.join(folder_path, file.filename)
 
-    # Asegúrate de que la carpeta existe
-    os.makedirs(folder_path, exist_ok=True)
+        # Asegúrate de que la carpeta existe
+        os.makedirs(folder_path, exist_ok=True)
 
-    # Guarda el archivo en el servidor
-    with open(file_location, "wb") as buffer:
-        buffer.write(await file.read())
+        # Guarda el archivo en el servidor
+        with open(file_location, "wb") as buffer:
+            buffer.write(await file.read())
 
 
-    foto_perfil_url = f"/images/{file.filename}"
+        foto_perfil_url = f"/images/{file.filename}"
+    else :
+        foto_perfil_url=None   
 
     
     # Crea el nuevo estudiante
@@ -306,34 +311,79 @@ async def añadir_estudiante(
         raise HTTPException(status_code=400, detail=f"Algo salió mal: {str(e)}")
 
 
+
 #METODO PARA AÑADIR PROFESORES
 @app.post("/añadirprofesor")
-async def añadir_profesor(datos_profesor:ProfesorBase, db: Session =Depends(get_db)):
-    existe_documento=db.query(Profesor).filter(Profesor.documento==datos_profesor.documento).first()
+async def añadir_estudiante(
+    documento: str = Form(...),
+    tipo_de_documento: str = Form(...),
+    nombre: str = Form(...),
+    apellido: str = Form(...),
+    fecha_nacimiento: str = Form(...),
+    genero: str = Form(...),
+    celular: str = Form(...),
+    correo: str = Form(...),
+    direccion: str = Form(...),
+    usuario: str = Form(...),
+    contraseña: str = Form(...),
+    file: UploadFile = File(None),  
+    db: Session = Depends(get_db)
+):
+    # Validación de documento y usuario
+    existe_documento = db.query(Profesor).filter(Profesor.documento == documento).first()
     if existe_documento:
-        raise HTTPException (status_code=400, detail=f"el documento '{datos_profesor.documento}' ya esta en uso ") 
-          
-    if usuario_existe_globalmente(datos_profesor.usuario, db):
-        raise HTTPException(status_code=400, detail=f"El usuario '{datos_profesor.usuario}' ya está en uso ")  
+        raise HTTPException(status_code=400, detail=f"El documento '{documento}' ya está en uso.")
     
-    if not verificar_contraseña(datos_profesor.contraseña):
-        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres , incluyendo números , caracteres especiales y  mayusculas")
+    if usuario_existe_globalmente(usuario, db):
+        raise HTTPException(status_code=400, detail=f"El usuario '{usuario}' ya está en uso.")
     
+    if not verificar_contraseña(contraseña):
+        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres, incluyendo números, caracteres especiales y mayúsculas.")
+    
+    if not verify_cel(celular):
+        raise HTTPException(status_code=400, detail="Número de celular inválido, debe tener 10 dígitos.")
+
+    if file:
+        if file.content_type not in ["image/jpeg", "image/png"]:
+            raise HTTPException(status_code=400, detail="Formato de archivo no soportado")
+        
+        folder_path = "micarpetaimg"
+        file_location = os.path.join(folder_path, file.filename)
+
+        # Asegúrate de que la carpeta existe
+        os.makedirs(folder_path, exist_ok=True)
+
+        # Guarda el archivo en el servidor
+        with open(file_location, "wb") as buffer:
+            buffer.write(await file.read())
+
+
+        foto_perfil_url = f"/images/{file.filename}"
+    else :
+        foto_perfil_url=None 
+
+    
+    # Crea el nuevo Profesor
     nuevo_profesor = Profesor(
-        documento=datos_profesor.documento,tipo_de_documento=datos_profesor.tipo_de_documento,nombre=datos_profesor.nombre,
-        apellido=datos_profesor.apellido,fecha_nacimiento=datos_profesor.fecha_nacimiento,genero=datos_profesor.genero,
-        celular=datos_profesor.celular,correo=datos_profesor.correo,direccion=datos_profesor.direccion,
-        usuario=datos_profesor.usuario,contraseña=encriptar_contraseña(datos_profesor.contraseña),
-        fecha_contratacion=datos_profesor.fecha_contratacion,foto_perfil=datos_profesor.foto_perfil
+        documento=documento,
+        tipo_de_documento=tipo_de_documento,
+        nombre=nombre,
+        apellido=apellido,
+        fecha_nacimiento=fecha_nacimiento,
+        genero=genero,
+        celular=celular,
+        correo=correo,
+        direccion=direccion,
+        usuario=usuario,
+        contraseña=encriptar_contraseña(contraseña),
+        foto_perfil=foto_perfil_url  # Ruta de la imagen guardada
     )
 
-
-    
     try:
         db.add(nuevo_profesor)
         db.commit()
         db.refresh(nuevo_profesor)
-        return "Profesor agregado exitosamente"
+        
     except SQLAlchemyError as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Algo salió mal: {str(e)}")
@@ -451,6 +501,8 @@ async def reservar_clase(datos_reserva: ReservaBase, db: Session = Depends(get_d
 
     if clase.cupos == 0:
         raise HTTPException(status_code=400, detail="Esta clase ya no tiene cupos disponibles")
+    
+    validar_dias_mora(estudiante.documento,db)
 
 
     # Verificar las horas semanales reservadas por el estudiante
@@ -521,28 +573,154 @@ async def añadir_observacion(datos_observacion:ObservacionBase , db:Session=Dep
         
         
 #METODO PARA AGREGAR SOLICITUDES 
-@app.post("/añadir_Solicitud")
+@app.post("/agregar_solicitud")
 async def añadir_solicitud(dato_solicitud:SolicitudBase, db:Session=Depends(get_db)):
     try:
         nueva_solicitud=Solicitud(documento=dato_solicitud.documento,descripcion=dato_solicitud.descripcion)
         db.add(nueva_solicitud)
         db.commit()
         db.refresh(nueva_solicitud)
-        return f"Solicitud fue agregada con exito"
     except SQLAlchemyError as e:
         db.rollback()
         raise HTTPException(status_code=400 ,detail=f"algo salio mal : {str(e)}")
 
 
+
 #Metodo para añadir comunicados
 
-@app.post("/comunicados/")
-async def crear_comunicado(titulo: str, descripcion: str, foto: str = None, db: Session = Depends(get_db)):
-    nuevo_comunicado = Comunicado(titulo=titulo, descripcion=descripcion, foto=foto)
-    db.add(nuevo_comunicado)
-    db.commit()
-    db.refresh(nuevo_comunicado)
-    return nuevo_comunicado
+
+@app.post("/crear_comunicados")
+async def crear_comunicado(
+    titulo: str = Form(...),descripcion: str = Form(...),file: UploadFile = File(...),  db:Session=Depends(get_db)):
+
+
+    if file.content_type not in ["image/jpeg", "image/png"]:
+        raise HTTPException(status_code=400, detail="Formato de archivo no soportado")
+    
+    folder_path = "micarpetaimg"
+    file_location = os.path.join(folder_path, file.filename)
+
+    # Asegúrate de que la carpeta existe
+    os.makedirs(folder_path, exist_ok=True)
+
+    # Guarda el archivo en el servidor
+    with open(file_location, "wb") as buffer:
+        buffer.write(await file.read())
+
+
+    foto_comunicado_url = f"/images/{file.filename}"
+
+    nuevo_comunicado=Comunicado(
+        titulo=titulo,
+        descripcion=descripcion,
+        foto=foto_comunicado_url
+    )
+    try:
+        db.add(nuevo_comunicado)
+        db.commit()
+        db.refresh(nuevo_comunicado)
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=400 ,detail=f"algo salio mal : {str(e)}")
+
+
+
+
+#METODO PARA AÑADIR LAS NOTAS DE EVALUACION
+
+
+@app.post("/add_notas")
+async def add_quiz_results(documento:str,speaking:float,listening:float,reading:float,writing:float,grammar:float,db:Session= Depends(get_db)):
+    verify_notes(speaking,listening,reading,writing)
+    validar_estudiante(documento,db)
+    validar_nivel_estudiante(documento,db)
+    borrar_registro_fallido(documento,get_student_level(documento,db),db)
+    nuevo_registro=RegistroEstudianteNivel(
+        documento=documento,
+        nivel=get_student_level(documento,db),
+        speaking=speaking,
+        listening=listening,
+        reading=reading,
+        writing=writing,
+        grammar=grammar
+    )
+    try:
+        db.add(nuevo_registro)
+        db.commit()
+        db.refresh(nuevo_registro)
+
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=400 ,detail=f"algo salio mal : {str(e)}")
+    make_quiz_observation(documento,db)
+    set_next_level(documento,db)   
+      
+    
+
+
+
+## METODOS DE ASISTENCIA
+@app.post("/asistencia/{id_reserva:int}")
+async def asistencia(id_reserva:int , db:Session=Depends(get_db) ) :
+    asistencia=Asistencia(
+        id_reserva=id_reserva,
+        asistencia=True
+    )
+      
+    try: 
+        db.add(asistencia)
+        db.commit()
+        db.refresh(asistencia)
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=400 ,detail=f"algo salio mal : {str(e)}")   
+    
+
+@app.post("/incumplimiento/{id_reserva:int}")
+async def incumplimiento(id_reserva:int , db:Session=Depends(get_db) ) :
+    asistencia=Asistencia(
+        id_reserva=id_reserva,
+        asistencia=False
+    )
+      
+    try: 
+        db.add(asistencia)
+        db.commit()
+        db.refresh(asistencia)
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=400 ,detail=f"algo salio mal : {str(e)}")      
+
+
+
+#METODO PARA AGREGAR UN PAGO
+@app.post("/agregar_pago")
+async def agregar_pagos(cuenta_documento:str,valor:int , db:Session=Depends(get_db)):
+    
+    try:
+        if validar_pago(cuenta_documento,valor,db):
+            cuenta_encontrada=db.query(Cuenta).filter(Cuenta.documento==cuenta_documento).first()
+            actualizar_dias_mora(cuenta_encontrada.documento,db)
+            actualizar_pago_minimo(cuenta_encontrada.documento,db)
+
+
+            if cuenta_encontrada.dias_mora>0:
+                valor=calcular_pago_minimo_base(cuenta_documento, db)
+
+            nuevo_pago=Pago(cuenta_documento=cuenta_documento,valor=valor)    
+
+
+            db.add(nuevo_pago) 
+            db.commit()
+            db.refresh(nuevo_pago)
+
+            actualizar_saldo(cuenta_documento,valor,db)
+            actualizar_fecha_proximo_pago(cuenta_documento,db)
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=400 ,detail=f"algo salio mal : {str(e)}")
+        
+
+           
+    
 
 
 #-------------------------------------------------------------------------------------------------------------------------            
@@ -555,30 +733,45 @@ async def crear_comunicado(titulo: str, descripcion: str, foto: str = None, db: 
 
 ## METODO PARA CONSULTAR TODOS LOS ESTUDIANTES
 @app.get("/obtenerestudiantes")
-async def get_estudiantes(db: Session = Depends(get_db)):
-    try:
-        estudiantes = db.query(Estudiante).all()  # Obtener  todos los estudiantes
-        return estudiantes  # retornar los estudiantes,claramente no?
+async def get_students( db: Session = Depends(get_db)):
+    estudiantes = db.query(Estudiante).all()
 
-    except SQLAlchemyError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    if not estudiantes:
+        raise HTTPException(status_code=404, detail="No se encontraron estudiantes")
+
+    # Construye un único objeto para cada estudiante con sus datos y los de la cuenta
+    resultados = []
+    for estudiante in estudiantes:
+        resultados.append({
+            "documento": estudiante.documento,
+            "tipo_de_documento": estudiante.tipo_de_documento,
+            "nombre": estudiante.nombre,
+            "apellido": estudiante.apellido,
+            "fecha_nacimiento": estudiante.fecha_nacimiento,
+            "genero": estudiante.genero,
+            "celular": estudiante.celular,
+            "correo": estudiante.correo,
+            "direccion": estudiante.direccion,
+            "sede": estudiante.sede,
+            "usuario": estudiante.usuario,
+            "contraseña": estudiante.contraseña,
+            "nivel_actual": estudiante.nivel_actual,
+            "plan": estudiante.plan,
+            "fecha_inscripcion": estudiante.fecha_inscripcion,
+            "foto_perfil": estudiante.foto_perfil,
+            # Datos de la cuenta obtenidos con la función :P
+            "saldo": obtener_dato_cuenta(estudiante.documento, "saldo", db),
+            "pagare": obtener_dato_cuenta(estudiante.documento, "pagare", db),
+            "pago_minimo": calcular_pago_minimo_base(estudiante.documento,db),
+            "pago_total": obtener_dato_cuenta(estudiante.documento, "pago_total", db),  
+            "monto_por_mora": calcular_monto_por_mora(estudiante.documento,db),
+            "fecha_proximo_pago": obtener_dato_cuenta(estudiante.documento, "fecha_proximo_pago", db),
+            "dias_mora": obtener_dato_cuenta(estudiante.documento, "dias_mora", db),
+        })
+
+
+    return resultados
     
-
-
-## METODO PARA CONSULTAR ESTUDIANTE POR DOCUMENTO
-@app.get("/obtenerestudiante/{documento}")
-async def get_estudiantes_documento( documento:str,db: Session = Depends(get_db)):
-    
-     estudiante = db.query(Estudiante).filter(Estudiante.documento==documento).first()  # Comparar documentos
-     if estudiante:
-        return estudiante # retornar el estudiantee,claramente no?
-     else:
-        raise HTTPException (status_code=400, detail="no se encontro estudiante")
-        
-         
-         
-
-
 
 
 
@@ -608,13 +801,73 @@ async def buscar_profesores(nombre: str, db: Session = Depends(get_db)):
     resultados = [
         {
             "documento": profesor.documento,
+            "tipo_de_documento":profesor.tipo_de_documento,
             "nombre": profesor.nombre,
             "apellido": profesor.apellido,
+            "fecha_nacimiento":profesor.fecha_nacimiento,
+            "genero":profesor.genero,
+            "celular":profesor.celular,
+            "correo":profesor.correo,
+            "direccion":profesor.direccion,
+            "usuario":profesor.usuario,
+            "contraseña":profesor.contraseña,
+            "fecha_contratacion":profesor.fecha_contratacion,
+            "foto_perfil":profesor.foto_perfil
         }
         for profesor in profesores
     ]
     
     return resultados
+
+
+#METODO PARA BUSQUEDA REACTIVA DE Estudiantes POR NOMBRE
+@app.get("/buscarestudiantes", response_model=List[dict])
+async def buscar_estudiantes_completo(nombre: str, db: Session = Depends(get_db)):
+    # Filtra estudiantes según el nombre o apellido
+    estudiantes = db.query(Estudiante).filter(
+        or_(
+            Estudiante.nombre.ilike(f"%{nombre}%"),  # Insensible a mayúsculas/minúsculas
+            Estudiante.apellido.ilike(f"%{nombre}%")
+        )
+    ).all()
+
+    if not estudiantes:
+        raise HTTPException(status_code=404, detail="No se encontraron estudiantes")
+
+    # Construye un único objeto para cada estudiante con sus datos y los de la cuenta
+    resultados = []
+    for estudiante in estudiantes:
+        resultados.append({
+            "documento": estudiante.documento,
+            "tipo_de_documento": estudiante.tipo_de_documento,
+            "nombre": estudiante.nombre,
+            "apellido": estudiante.apellido,
+            "fecha_nacimiento": estudiante.fecha_nacimiento,
+            "genero": estudiante.genero,
+            "celular": estudiante.celular,
+            "correo": estudiante.correo,
+            "direccion": estudiante.direccion,
+            "sede": estudiante.sede,
+            "usuario": estudiante.usuario,
+            "contraseña": estudiante.contraseña,
+            "nivel_actual": estudiante.nivel_actual,
+            "plan": estudiante.plan,
+            "fecha_inscripcion": estudiante.fecha_inscripcion,
+            "foto_perfil": estudiante.foto_perfil,
+            # Datos de la cuenta obtenidos con la función :P
+            "saldo": obtener_dato_cuenta(estudiante.documento, "saldo", db),
+            "pagare": obtener_dato_cuenta(estudiante.documento, "pagare", db),
+            "pago_minimo": obtener_dato_cuenta(estudiante.documento, "pago_minimo", db),
+            "pago_total": obtener_dato_cuenta(estudiante.documento, "pago_minimo", db),  
+            "monto_por_mora": calcular_monto_por_mora(estudiante.documento,db),
+            "fecha_proximo_pago": obtener_dato_cuenta(estudiante.documento, "fecha_proximo_pago", db),
+            "dias_mora": obtener_dato_cuenta(estudiante.documento, "dias_mora", db),
+        })
+
+    return resultados
+
+
+
 
 ## METODO PARA CONSULTAR EL NOMBRE DE LOS PLANES
 @app.get("/obtenernombreplanes")
@@ -649,7 +902,7 @@ async def obtenerclasesestudiante(sede:str,nivel:str , db:Session=Depends(get_db
                 Clase.sede==sede,
                 Clase.nivel==nivel
             )
-        ).all()
+        ).order_by(asc(Clase.hora_inicio)).all()
         resultados=[
             {
                 "id_clase":clase.id_clase,
@@ -685,19 +938,23 @@ async def obtener_reservas(documento_estudiante: str, db: Session = Depends(get_
 
     
     
-##filtrar los observadores por documento de estudiante
+
 @app.get("/filtro_ObservadoresDocumento/{documento}")
 async def filtro_observaciones_por_documento(documento: str, db: Session = Depends(get_db)):
     try:
-        # Realiza la consulta a la base de datos para filtrar por documento
-        observaciones = db.query(Observacion).filter(Observacion.documento == documento).all()
+        observaciones = (
+            db.query(Observacion)
+            .filter(Observacion.documento == documento)
+            .order_by(desc(Observacion.fecha))  # Ordenar por fecha de creación descendente
+            .all()
+        )
 
         return observaciones
 
     except SQLAlchemyError as e:
         # Si hay un error en la consulta, se lanza una excepción con el mensaje de error
         raise HTTPException(status_code=400, detail=str(e))
-    
+
     
     
 #Es para mostrar las observaciones del estudiante en la vista estudiante filtrados por fecha
@@ -705,30 +962,48 @@ async def filtro_observaciones_por_documento(documento: str, db: Session = Depen
 async def filtro_observaciones_por_documento(documento: str,fecha:str, db: Session = Depends(get_db)):
     try:
         # Realiza la consulta a la base de datos para filtrar por documento
-        observaciones = db.query(Observacion).filter(Observacion.documento == documento) and db.query(Observacion).filter(Observacion.fecha == fecha) .all()
+        observaciones = db.query(Observacion).filter(Observacion.documento == documento) and db.query(Observacion).filter(Observacion.fecha == fecha).order_by(desc(Observacion.fecha)).all()
         return observaciones
     except SQLAlchemyError as e:
         # Si hay un error en la consulta, se lanza una excepción con el mensaje de error
         raise HTTPException(status_code=400, detail=str(e))
     
 
-#Metodo para tener solicitudes del estudiante por documento y contestadas
+#METODO PARA TRAER LA INFORMACION DE LA CUENTA
+@app.get("/datos_cuenta/{documento}")
+async def obtener_cuenta(documento:str, db:Session=Depends(get_db)):
+    Cuenta_encontrada=db.query(Cuenta).filter(Cuenta.documento==documento).first()
+    
+    actualizar_dias_mora(Cuenta_encontrada.documento,db)
+    actualizar_pago_minimo(Cuenta_encontrada.documento,db)
+    monto_por_mora=calcular_monto_por_mora(Cuenta_encontrada.documento,db)
+
+    return {
+        "saldo":Cuenta_encontrada.saldo,
+        "pagare":Cuenta_encontrada.pagare,
+        "documento": Cuenta_encontrada.documento,
+        "pago_minimo":calcular_pago_minimo_base(Cuenta_encontrada.documento,db) ,
+        "pago_total":Cuenta_encontrada.pago_minimo ,
+        "monto_por_mora":monto_por_mora,
+        "fecha_proximo_pago":Cuenta_encontrada.fecha_proximo_pago,
+        "dias_mora":Cuenta_encontrada.dias_mora,
+    }
+
+
+
+
+#Metodo para tener solicitudes del estudiante 
 @app.get("/obtenersolicitudestudiante/{documento}")
 async def obtener_solicitudes_estudiante(documento: str, db: Session = Depends(get_db)):
     try:
-        solicitudes_estudiante = db.query(Solicitud).filter(
-            and_(
-                Solicitud.documento == documento,
-                Solicitud.contestacion == True
-            )
-        ).all()
-
+        solicitudes_estudiante = db.query(Solicitud).filter(  Solicitud.documento == documento ).order_by(desc(Solicitud.fecha_creacion)).all()
         resultados = [
             {
                 "id_solicitud": solicitud.id_solicitud,
                 "documento": solicitud.documento,
                 "descripcion": solicitud.descripcion,
                 "respuesta": solicitud.respuesta,
+                "contestacion": solicitud.respuesta,
                 "fecha_creacion": solicitud.fecha_creacion,
             }
             for solicitud in solicitudes_estudiante
@@ -737,75 +1012,197 @@ async def obtener_solicitudes_estudiante(documento: str, db: Session = Depends(g
         if resultados:
             return resultados
         else:
-            raise HTTPException(status_code=400, detail="No hay solicitudes para el estudiante.")
+            return None
 
     except SQLAlchemyError as e:
         raise HTTPException(status_code=400, detail=str(e)) 
 
-#METODO PARA TRAER LA INFORMACION DE LA CUENTA
-@app.get("/datos_cuenta/{documento}")
-async def obtener_cuenta(documento:str, db:Session=Depends(get_db)):
-    Cuenta_encontrada=db.query(Cuenta).filter(Cuenta.documento==documento).first()
-    return Cuenta_encontrada
 
 
 
 
-#METODO PARA TRAER LA INFORMACION DE LAS SOLICITUDES
-@app.get("/traer_datos_solicitudes")
-async def obtener_solicitudes(db:Session=Depends(get_db)):
+#METODO PARA OBTENER TODAS LAS SOLICITUDES
+@app.get("/obtenersolicitudes")
+async def obtener_solicitudes(db: Session = Depends(get_db)):
     try:
-        info_solicitudes = db.query(Solicitud).all()
-        if info_solicitudes:
-            return info_solicitudes
-        else: 
-            return {"message": "No hay solicitudes"}
-    except SQLAlchemyError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-#METODO PARA TRAER LA INFORMACION DE LAS SOLICITUDES POR ESTUDIANTE
-@app.get("/traer_datos_solicitudes/{documento}")
-async def obtener_solicitudes(documento: str, db:Session=Depends(get_db)):
-    try:
-        solicitudes_estudiante = db.query(Solicitud).filter(
-            and_(
-                Solicitud.documento == documento,
-                Solicitud.contestacion == False
-            )
-        ).all()
-
+        solicitudes = db.query(Solicitud).all()
         resultados = [
             {
                 "id_solicitud": solicitud.id_solicitud,
+                "documento": solicitud.documento,
                 "descripcion": solicitud.descripcion,
                 "respuesta": solicitud.respuesta,
+                "contestacion": solicitud.respuesta,
                 "fecha_creacion": solicitud.fecha_creacion,
             }
-            for solicitud in solicitudes_estudiante
+            for solicitud in solicitudes
         ]
 
         if resultados:
             return resultados
         else:
-            raise HTTPException(status_code=400, detail="No hay solicitudes para el estudiante.")
+            return None
 
     except SQLAlchemyError as e:
-        raise HTTPException(status_code=400, detail=str(e)) 
+        raise HTTPException(status_code=400, detail=str(e))         
+
+
+
+
+
 
 
 
 #Metodo para traer todos los comunicados
-@app.get("/todos_comunicados/")
-async def obtener_comunicados(db: Session = Depends(get_db)):
-    comunicados = db.query(Comunicado).all()
+@app.get("/obtener_comunicados")
+async def get_comunicados(db: Session = Depends(get_db)):
     try:
-        if comunicados:
-            return comunicados
-        else: 
-            return {"message": "No hay solicitudes"}
+        comunicados = db.query(Comunicado).all()  # Obtener  todos los comunicados
+        return comunicados  # retornar los comunicaos,claramente no?
+
     except SQLAlchemyError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    
+    
+    
+    #metodo get para traer las clases reservadas
+@app.get("/clases_reservadas/{documento_estudiante}")
+async def obtener_reservas(documento_estudiante: str, db: Session = Depends(get_db)):
+    try:
+        # Realiza la consulta a la base de datos para filtrar por documento_estudiante
+        reservas = db.query(Reserva, Clase)\
+            .join(Clase)\
+            .filter(Reserva.documento_estudiante == documento_estudiante)\
+            .all()
+
+        # Formatea la respuesta
+        result = []
+        for reserva, clase in reservas:
+            result.append({
+                'id_reserva': reserva.id_reserva,
+                'id_clase': clase.id_clase,
+                'sede': clase.sede,
+                'nivel': clase.nivel,
+                'hora_inicio': str(clase.hora_inicio),  # Convertir Time a string
+                'hora_fin': str(clase.hora_fin),        # Convertir Time a string
+                'fecha': str(clase.fecha),              # Convertir Date a string
+                'documento_profesor':get_name_teacher_by_dni(clase.documento_profesor,db) ,
+                'documento_estudiante': reserva.documento_estudiante,
+                'cupos': clase.cupos
+            })
+
+        return result
+
+    except SQLAlchemyError as e:
+        # Si hay un error en la consulta, se lanza una excepción con el mensaje de error
+        return {"message": "No hay clases Reservadas"}
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    
+    
+
+##filtrar las clases por documento de profesor
+@app.get("/filtro_ClasesDocumento/{documento}")
+async def filtro_Clases_por_documento(documento: str, db: Session = Depends(get_db)):
+    try:
+        # Realiza la consulta a la base de datos para filtrar por documento
+        Clases = db.query(Clase).filter(Clase.documento_profesor == documento).all()
+        result=[]
+        for clase in Clases:
+            result.append({
+                'id_clase': clase.id_clase,
+                'sede': clase.sede,
+                'nivel': clase.nivel,
+                'hora_inicio': str(clase.hora_inicio),  # Convertir Time a string
+                'hora_fin': str(clase.hora_fin),        # Convertir Time a string
+                'fecha': str(clase.fecha),              # Convertir Date a string
+                'documento_profesor':get_name_teacher_by_dni(clase.documento_profesor,db) ,
+                'estudiantes': count_students(clase.id_clase,db)
+            })
+
+        return result 
+
+    except SQLAlchemyError as e:
+        # Si hay un error en la consulta, se lanza una excepción con el mensaje de error
+        raise HTTPException(status_code=400, detail=str(e))
+         
+
+#METODO PARA OBTENER TODOS LOS ESTUDIANTES DE UNA CLASE / ASISTENCIA
+
+@app.get("/getStudentsByClass/{id_clase}")
+async def getStudentsByClass(id_clase: int, db: Session = Depends(get_db)):
+    try:
+        estudiantes_encontrados = db.query( Estudiante,Reserva,Clase,Asistencia.asistencia  ).join(
+            Reserva, Reserva.documento_estudiante == Estudiante.documento).join(
+            Clase, Reserva.id_clase == Clase.id_clase).outerjoin(
+            Asistencia, Reserva.id_reserva == Asistencia.id_reserva  ).filter(
+            Clase.id_clase == id_clase).all()
+        
+        result = []
+        for estudiante, reserva, clase, asistencia in estudiantes_encontrados:
+            result.append({
+                'documento': estudiante.documento,
+                'nombre': estudiante.nombre,
+                'apellido': estudiante.apellido,
+                "id_reserva": reserva.id_reserva,
+                'sede': clase.sede,
+                'nivel': clase.nivel,
+                'hora_inicio': str(clase.hora_inicio),  
+                'hora_fin': str(clase.hora_fin),
+                'fecha': str(clase.fecha),
+                'asistencia': asistencia 
+            })
+
+        return result
+
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+
+#METODO PARA OBTENER LAS NOTAS DE LOS ESTUDIANTE
+
+@app.get("/getStudentsNotes/{nivel}/{documento}")
+async def getStudentsNotes(nivel: str,documento:str, db: Session = Depends(get_db)):
+    try:
+        notas_encontradas=db.query(RegistroEstudianteNivel).filter(
+            and_(
+                RegistroEstudianteNivel.documento==documento,
+                RegistroEstudianteNivel.nivel==nivel)).first()
+        if notas_encontradas:
+            return notas_encontradas
+        else:
+            return None               
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=400, detail=str(e))  
+
+
+
+@app.get("/getStudentpayments/{documento}")
+async def getStudentspayments(documento:str,db:Session = Depends(get_db)):
+    try:
+        pagos_encontradas=db.query(Pago).filter(Pago.cuenta_documento==documento).order_by(desc(Pago.fecha)).all()
+        if pagos_encontradas:
+            return pagos_encontradas
+        else:
+            return None               
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=400, detail=str(e))                
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #-------------------------------------------------------------------------------------------------------------------------            
 #-------------------------------------------------------------------------------------------------------------------------            
@@ -828,6 +1225,19 @@ async def delete_estudiante(documento:str,db:Session=Depends(get_db)):
 
 
 
+#METODO PARA ELIMINAR UN PROFESOR
+@app.delete("/eliminarprofesor/{documento}")
+async def delete_estudiante(documento:str,db:Session=Depends(get_db)):
+    profesor_encontrado=db.query(Profesor).filter(documento==Profesor.documento).first()
+    if profesor_encontrado:
+        db.delete(profesor_encontrado)
+        db.commit()
+        return {"":f"profesor con documento {documento} eliminado"}
+    else:
+        raise HTTPException (status_code=400, detail="no se encontro profesor")
+
+
+
 #METODO PARA ELIMINAR UNA SOLICITUD 
 @app.delete("/eliminar_solicitud/{id}")
 async def delete_solicitud(id:int,db:Session=Depends(get_db)):
@@ -835,7 +1245,6 @@ async def delete_solicitud(id:int,db:Session=Depends(get_db)):
     if solicitud_encontrada:
         db.delete(solicitud_encontrada)
         db.commit()
-        return {"":f"Solicitud con id {id} eliminada"}
     else:
         raise HTTPException (status_code=400, detail="no se encontro solicitud")
 
@@ -881,20 +1290,6 @@ async def cancelar_reserva(datos_reserva: ReservaBase, db: Session = Depends(get
         raise HTTPException(status_code=400, detail=f"Algo salió mal: {str(e)}")
 
 
-#Metodo para eliminar comunicado
-@app.delete("/comunicados/{id_comunicado}")
-async def eliminar_comunicado(id_comunicado: int, db: Session = Depends(get_db)):
-    comunicado = db.query(Comunicado).filter(Comunicado.id_comunicado == id_comunicado).first()
-    
-    if not comunicado:
-        raise HTTPException(status_code=404, detail="Comunicado no encontrado.")
-    
-    db.delete(comunicado)
-    db.commit()
-    return {"detail": "Comunicado eliminado."}
-
-
-
 
 
 
@@ -905,24 +1300,10 @@ async def eliminar_comunicado(id_comunicado: int, db: Session = Depends(get_db))
 
 
 #METODOS DE EDICION/ACTUALIZACION (PUT)  
-#ACABO DE INAGURAR ESTE APARTADO YO SOY MUY ASPERO JSJSJSJJSJS
-
-
-#METODO PARA ACTUALIZAR LA SOLICITUD
-@app.put("/actualizar_solicitud/{id}")
-async def actualizar_solicitud(id: int, solicitud: SolicitudBase, db: Session = Depends(get_db)):
-    db.query(Solicitud).filter(Solicitud.id_solicitud == id).update({
-        Solicitud.descripcion: solicitud.descripcion,
-        Solicitud.respuesta: solicitud.respuesta,
-        Solicitud.contestacion: solicitud.contestacion
-    })
-    db.commit()
-    return {"message": "Solicitud actualizada con éxito"}
-
 
 #METODO PARA AÑADIR LA CONTESTACION
-@app.put("/actualizar_contestacion/{id_solicitud}/{documento}/{respuesta}")
-async def actualizar_contestacion(id_solicitud: int, documento: str, respuesta: str, db: Session = Depends(get_db)):
+@app.put("/actualizar_contestacion/{id_solicitud}/{respuesta}")
+async def actualizar_contestacion(id_solicitud: int, respuesta: str, db: Session = Depends(get_db)):
     solicitud = db.query(Solicitud).filter(Solicitud.id_solicitud == id_solicitud).first()
     
     if not solicitud:
@@ -930,28 +1311,172 @@ async def actualizar_contestacion(id_solicitud: int, documento: str, respuesta: 
 
     # Actualizar los campos
     solicitud.contestacion = True
-    solicitud.respuesta = respuesta  # Asegúrate de que 'respuesta' esté definido
-    solicitud.documento = documento
+    solicitud.respuesta = respuesta  
 
     db.commit()
     
-    return {"message": "Contestación actualizada con éxito"}
 
 
-#Metodo para actualizar comunicados
-@app.put("/comunicados/{id_comunicado}")
-async def editar_comunicado(id_comunicado: int, titulo: str = None, descripcion: str = None, foto: str = None, db: Session = Depends(get_db)):
-    comunicado = db.query(Comunicado).filter(Comunicado.id_comunicado == id_comunicado).first()
+
+
+
+
+
+
+##METODO PARA ACTUALIZAR ESTUDIANTE
+@app.put("/actualizarestudiante/{documento}")
+async def actualizar_estudiante(
+    documento: str,
+    tipo_de_documento: str = Form(...),
+    nombre: str = Form(...),
+    apellido: str = Form(...),
+    fecha_nacimiento: str = Form(...),
+    genero: str = Form(...),
+    celular: str = Form(...),
+    correo: str = Form(...),
+    direccion: str = Form(...),
+    sede: str = Form(...),
+    usuario: str = Form(...),
+    contraseña: str = Form(...),
+    nivel_actual: str = Form(...),
+    plan: str = Form(...),
+    file: UploadFile = File(None),  
+    db: Session = Depends(get_db)
+):
+    estudiante_existente = db.query(Estudiante).filter(Estudiante.documento == documento).first()
     
-    if not comunicado:
-        raise HTTPException(status_code=404, detail="Comunicado no encontrado.")
+    if not estudiante_existente:
+        raise HTTPException(status_code=404, detail="Estudiante no encontrado")
     
-    if titulo is not None:
-        comunicado.titulo = titulo
-    if descripcion is not None:
-        comunicado.descripcion = descripcion
-    if foto is not None:
-        comunicado.foto = foto
+    if usuario != estudiante_existente.usuario:  # Solo verificar si el usuario ha cambiado
+        if usuario_existe_globalmente(usuario, db):
+            raise HTTPException(status_code=400, detail=f"El usuario '{usuario}' ya está en uso.")
+    
+    if not verify_cel(celular):
+        raise HTTPException(status_code=400, detail="Número de celular inválido, debe tener 10 dígitos.")
+    
+    if file:
+        if file.content_type not in ["image/jpeg", "image/png"]:
+            raise HTTPException(status_code=400, detail="Formato de archivo no soportado")
+        
+        folder_path = "micarpetaimg"
+        file_location = os.path.join(folder_path, file.filename)
 
-    db.commit()
-    return comunicado
+        os.makedirs(folder_path, exist_ok=True)
+
+        with open(file_location, "wb") as buffer:
+            buffer.write(await file.read())
+
+        foto_perfil_url = f"/images/{file.filename}"
+    else:
+        foto_perfil_url = estudiante_existente.foto_perfil  
+
+    # Actualizar datos del estudiante
+    estudiante_existente.tipo_de_documento = tipo_de_documento
+    estudiante_existente.nombre = nombre
+    estudiante_existente.apellido = apellido
+    estudiante_existente.fecha_nacimiento = fecha_nacimiento
+    estudiante_existente.genero = genero
+    estudiante_existente.celular = celular
+    estudiante_existente.correo = correo
+    estudiante_existente.direccion = direccion
+    estudiante_existente.sede = sede
+
+    # Verificar si el usuario ha cambiado
+    if usuario != estudiante_existente.usuario:
+        estudiante_existente.usuario = usuario  # Actualizar usuario solo si ha cambiado
+
+    # Verificar si la contraseña fue modificada
+    if contraseña != estudiante_existente.contraseña:
+        if not verificar_contraseña(contraseña):
+            raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres, incluyendo números, caracteres especiales y mayúsculas.")
+        estudiante_existente.contraseña = encriptar_contraseña(contraseña)  # Encriptar solo si se cambió
+
+    estudiante_existente.nivel_actual = nivel_actual
+    estudiante_existente.plan = plan
+    estudiante_existente.foto_perfil = foto_perfil_url  
+
+    try:
+        db.commit()
+        db.refresh(estudiante_existente)
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Algo salió mal: {str(e)}")
+
+
+
+
+
+##METODO PARA ACTUALIZAR PROFESOR
+@app.put("/actualizarprofesor/{documento}")
+async def actualizar_profesor(
+    documento: str,
+    tipo_de_documento: str = Form(...),
+    nombre: str = Form(...),
+    apellido: str = Form(...),
+    fecha_nacimiento: str = Form(...),
+    genero: str = Form(...),
+    celular: str = Form(...),
+    correo: str = Form(...),
+    direccion: str = Form(...),
+    usuario: str = Form(...),
+    contraseña: str = Form(...),
+    file: UploadFile = File(None),  
+    db: Session = Depends(get_db)
+):
+    profesor_existente = db.query(Profesor).filter(Profesor.documento == documento).first()
+    
+    if not profesor_existente:
+        raise HTTPException(status_code=404, detail="Profesor no encontrado")
+    
+    if usuario != profesor_existente.usuario:  # Solo verificar si el usuario ha cambiado
+        if usuario_existe_globalmente(usuario, db):
+            raise HTTPException(status_code=400, detail=f"El usuario '{usuario}' ya está en uso.")
+    
+    if not verify_cel(celular):
+        raise HTTPException(status_code=400, detail="Número de celular inválido, debe tener 10 dígitos.")
+    
+    if file:
+        if file.content_type not in ["image/jpeg", "image/png"]:
+            raise HTTPException(status_code=400, detail="Formato de archivo no soportado")
+        
+        folder_path = "micarpetaimg"
+        file_location = os.path.join(folder_path, file.filename)
+
+        os.makedirs(folder_path, exist_ok=True)
+
+        with open(file_location, "wb") as buffer:
+            buffer.write(await file.read())
+
+        foto_perfil_url = f"/images/{file.filename}"
+    else:
+        foto_perfil_url = profesor_existente.foto_perfil  
+
+    # Actualizar datos del estudiante
+    profesor_existente.tipo_de_documento = tipo_de_documento
+    profesor_existente.nombre = nombre
+    profesor_existente.apellido = apellido
+    profesor_existente.fecha_nacimiento = fecha_nacimiento
+    profesor_existente.genero = genero
+    profesor_existente.celular = celular
+    profesor_existente.correo = correo
+    profesor_existente.direccion = direccion
+
+    # Verificar si el usuario ha cambiado
+    if usuario != profesor_existente.usuario:
+        profesor_existente.usuario = usuario  # Actualizar usuario solo si ha cambiado
+
+    # Verificar si la contraseña fue modificada
+    if contraseña != profesor_existente.contraseña:
+        if not verificar_contraseña(contraseña):
+            raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres, incluyendo números, caracteres especiales y mayúsculas.")
+        profesor_existente.contraseña = encriptar_contraseña(contraseña)  # Encriptar solo si se cambió
+
+    profesor_existente.foto_perfil = foto_perfil_url  
+
+    try:
+        db.commit()
+        db.refresh(profesor_existente)
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Algo salió mal: {str(e)}")

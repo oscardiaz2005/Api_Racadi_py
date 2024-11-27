@@ -63,6 +63,8 @@ def validar_fecha(fecha: datetime):
 def validar_profesor(documento:str , db :Session) :
     exist=db.query(Profesor).filter(documento == Profesor.documento).first()
     if not exist:
-        raise HTTPException(status_code=400, detail="El documento no coincide con ninguno de nuestros profesores:).")
+        raise HTTPException(status_code=400, detail="El documento no coincide con ninguno de nuestros profesores")
+    
+    
 
         
