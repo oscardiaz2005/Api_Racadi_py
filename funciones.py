@@ -221,8 +221,7 @@ def make_quiz_observation(documento:str,db:Session):
 
 
 
-
-
+    
 
 
 
