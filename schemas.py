@@ -73,6 +73,10 @@ class ClaseBase(BaseModel):
     cupos: int
     administrador: Optional[int] = None
 
+class VerficarUsuario(BaseModel):
+    tipo_de_documento: Literal['cedula','cedula extranjera','tarjeda de identidad']
+    documento: str
+
 
 class ReservaBase(BaseModel):
     id_clase: int
@@ -100,6 +104,7 @@ class PlanBase(BaseModel):
 
 
 class CuentaBase(BaseModel):
+    pagare: Optional [int] = None
     documento: str
     saldo: int
     pago_minimo: int

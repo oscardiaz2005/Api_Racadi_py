@@ -105,6 +105,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITMO])
         # Obtener el nombre de usuario  desde el token
+        print(payload)
         usuario: str = payload.get("usuario")
         if usuario is None:
             raise credentials_exception
@@ -119,6 +120,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
         raise credentials_exception
     
     return user
+
 
 # Endpoint protegido para obtener el usuario actual
 @app.get("/users/me")
@@ -288,6 +290,7 @@ async def añadir_estudiante(
         
         # Crea la cuenta asociada al estudiante
         nueva_cuenta = Cuenta(
+            pagare=None,
             documento=nuevo_estudiante.documento,
             saldo=obtener_saldo(nuevo_estudiante.plan, db),
             pago_minimo=obtener_pago_minimo(nuevo_estudiante.plan, db),
@@ -495,20 +498,51 @@ async def reservar_clase(datos_reserva: ReservaBase, db: Session = Depends(get_d
         raise HTTPException(status_code=400, detail=f"Algo salió mal: {str(e)}")
 
 
+
+
+
+
+
+
+
+#METODO PARA MOSTRAR LAS OBSEVACIONES AGREGADAS
+@app.post("/añadirObservacion")
+async def añadir_observacion(datos_observacion:ObservacionBase , db:Session=Depends(get_db)):
     
-
-
-
-
-
-
+    try:
+          nueva_observacion=Observacion(descripcion=datos_observacion.descripcion,documento=datos_observacion.documento,creada_por=datos_observacion.creada_por)
+          db.add(nueva_observacion) 
+          db.commit()
+          db.refresh(nueva_observacion)
+          return f"Observacion fue agregada"
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=400 ,detail=f"algo salio mal : {str(e)}")
         
+        
+#METODO PARA AGREGAR SOLICITUDES 
+@app.post("/añadir_Solicitud")
+async def añadir_solicitud(dato_solicitud:SolicitudBase, db:Session=Depends(get_db)):
+    try:
+        nueva_solicitud=Solicitud(documento=dato_solicitud.documento,descripcion=dato_solicitud.descripcion)
+        db.add(nueva_solicitud)
+        db.commit()
+        db.refresh(nueva_solicitud)
+        return f"Solicitud fue agregada con exito"
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=400 ,detail=f"algo salio mal : {str(e)}")
 
-    
 
+#Metodo para añadir comunicados
 
-
-
+@app.post("/comunicados/")
+async def crear_comunicado(titulo: str, descripcion: str, foto: str = None, db: Session = Depends(get_db)):
+    nuevo_comunicado = Comunicado(titulo=titulo, descripcion=descripcion, foto=foto)
+    db.add(nuevo_comunicado)
+    db.commit()
+    db.refresh(nuevo_comunicado)
+    return nuevo_comunicado
 
 
 #-------------------------------------------------------------------------------------------------------------------------            
@@ -651,8 +685,127 @@ async def obtener_reservas(documento_estudiante: str, db: Session = Depends(get_
 
     
     
+##filtrar los observadores por documento de estudiante
+@app.get("/filtro_ObservadoresDocumento/{documento}")
+async def filtro_observaciones_por_documento(documento: str, db: Session = Depends(get_db)):
+    try:
+        # Realiza la consulta a la base de datos para filtrar por documento
+        observaciones = db.query(Observacion).filter(Observacion.documento == documento).all()
+
+        return observaciones
+
+    except SQLAlchemyError as e:
+        # Si hay un error en la consulta, se lanza una excepción con el mensaje de error
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    
+    
+#Es para mostrar las observaciones del estudiante en la vista estudiante filtrados por fecha
+@app.get("/filtro_ObservadoresFecha/{documento}/{fecha}")
+async def filtro_observaciones_por_documento(documento: str,fecha:str, db: Session = Depends(get_db)):
+    try:
+        # Realiza la consulta a la base de datos para filtrar por documento
+        observaciones = db.query(Observacion).filter(Observacion.documento == documento) and db.query(Observacion).filter(Observacion.fecha == fecha) .all()
+        return observaciones
+    except SQLAlchemyError as e:
+        # Si hay un error en la consulta, se lanza una excepción con el mensaje de error
+        raise HTTPException(status_code=400, detail=str(e))
     
 
+#Metodo para tener solicitudes del estudiante por documento y contestadas
+@app.get("/obtenersolicitudestudiante/{documento}")
+async def obtener_solicitudes_estudiante(documento: str, db: Session = Depends(get_db)):
+    try:
+        solicitudes_estudiante = db.query(Solicitud).filter(
+            and_(
+                Solicitud.documento == documento,
+                Solicitud.contestacion == True
+            )
+        ).all()
+
+        resultados = [
+            {
+                "id_solicitud": solicitud.id_solicitud,
+                "documento": solicitud.documento,
+                "descripcion": solicitud.descripcion,
+                "respuesta": solicitud.respuesta,
+                "fecha_creacion": solicitud.fecha_creacion,
+            }
+            for solicitud in solicitudes_estudiante
+        ]
+
+        if resultados:
+            return resultados
+        else:
+            raise HTTPException(status_code=400, detail="No hay solicitudes para el estudiante.")
+
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=400, detail=str(e)) 
+
+#METODO PARA TRAER LA INFORMACION DE LA CUENTA
+@app.get("/datos_cuenta/{documento}")
+async def obtener_cuenta(documento:str, db:Session=Depends(get_db)):
+    Cuenta_encontrada=db.query(Cuenta).filter(Cuenta.documento==documento).first()
+    return Cuenta_encontrada
+
+
+
+
+#METODO PARA TRAER LA INFORMACION DE LAS SOLICITUDES
+@app.get("/traer_datos_solicitudes")
+async def obtener_solicitudes(db:Session=Depends(get_db)):
+    try:
+        info_solicitudes = db.query(Solicitud).all()
+        if info_solicitudes:
+            return info_solicitudes
+        else: 
+            return {"message": "No hay solicitudes"}
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+#METODO PARA TRAER LA INFORMACION DE LAS SOLICITUDES POR ESTUDIANTE
+@app.get("/traer_datos_solicitudes/{documento}")
+async def obtener_solicitudes(documento: str, db:Session=Depends(get_db)):
+    try:
+        solicitudes_estudiante = db.query(Solicitud).filter(
+            and_(
+                Solicitud.documento == documento,
+                Solicitud.contestacion == False
+            )
+        ).all()
+
+        resultados = [
+            {
+                "id_solicitud": solicitud.id_solicitud,
+                "descripcion": solicitud.descripcion,
+                "respuesta": solicitud.respuesta,
+                "fecha_creacion": solicitud.fecha_creacion,
+            }
+            for solicitud in solicitudes_estudiante
+        ]
+
+        if resultados:
+            return resultados
+        else:
+            raise HTTPException(status_code=400, detail="No hay solicitudes para el estudiante.")
+
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=400, detail=str(e)) 
+
+
+
+#Metodo para traer todos los comunicados
+@app.get("/todos_comunicados/")
+async def obtener_comunicados(db: Session = Depends(get_db)):
+    comunicados = db.query(Comunicado).all()
+    try:
+        if comunicados:
+            return comunicados
+        else: 
+            return {"message": "No hay solicitudes"}
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 #-------------------------------------------------------------------------------------------------------------------------            
 #-------------------------------------------------------------------------------------------------------------------------            
@@ -674,6 +827,17 @@ async def delete_estudiante(documento:str,db:Session=Depends(get_db)):
         raise HTTPException (status_code=400, detail="no se encontro estudiante")
 
 
+
+#METODO PARA ELIMINAR UNA SOLICITUD 
+@app.delete("/eliminar_solicitud/{id}")
+async def delete_solicitud(id:int,db:Session=Depends(get_db)):
+    solicitud_encontrada=db.query(Solicitud).filter(id==Solicitud.id_solicitud).first()
+    if solicitud_encontrada:
+        db.delete(solicitud_encontrada)
+        db.commit()
+        return {"":f"Solicitud con id {id} eliminada"}
+    else:
+        raise HTTPException (status_code=400, detail="no se encontro solicitud")
 
 
 
@@ -717,6 +881,18 @@ async def cancelar_reserva(datos_reserva: ReservaBase, db: Session = Depends(get
         raise HTTPException(status_code=400, detail=f"Algo salió mal: {str(e)}")
 
 
+#Metodo para eliminar comunicado
+@app.delete("/comunicados/{id_comunicado}")
+async def eliminar_comunicado(id_comunicado: int, db: Session = Depends(get_db)):
+    comunicado = db.query(Comunicado).filter(Comunicado.id_comunicado == id_comunicado).first()
+    
+    if not comunicado:
+        raise HTTPException(status_code=404, detail="Comunicado no encontrado.")
+    
+    db.delete(comunicado)
+    db.commit()
+    return {"detail": "Comunicado eliminado."}
+
 
 
 
@@ -729,27 +905,53 @@ async def cancelar_reserva(datos_reserva: ReservaBase, db: Session = Depends(get
 
 
 #METODOS DE EDICION/ACTUALIZACION (PUT)  
+#ACABO DE INAGURAR ESTE APARTADO YO SOY MUY ASPERO JSJSJSJJSJS
 
 
+#METODO PARA ACTUALIZAR LA SOLICITUD
+@app.put("/actualizar_solicitud/{id}")
+async def actualizar_solicitud(id: int, solicitud: SolicitudBase, db: Session = Depends(get_db)):
+    db.query(Solicitud).filter(Solicitud.id_solicitud == id).update({
+        Solicitud.descripcion: solicitud.descripcion,
+        Solicitud.respuesta: solicitud.respuesta,
+        Solicitud.contestacion: solicitud.contestacion
+    })
+    db.commit()
+    return {"message": "Solicitud actualizada con éxito"}
 
 
+#METODO PARA AÑADIR LA CONTESTACION
+@app.put("/actualizar_contestacion/{id_solicitud}/{documento}/{respuesta}")
+async def actualizar_contestacion(id_solicitud: int, documento: str, respuesta: str, db: Session = Depends(get_db)):
+    solicitud = db.query(Solicitud).filter(Solicitud.id_solicitud == id_solicitud).first()
+    
+    if not solicitud:
+        raise HTTPException(status_code=404, detail="Solicitud no encontrada.")
+
+    # Actualizar los campos
+    solicitud.contestacion = True
+    solicitud.respuesta = respuesta  # Asegúrate de que 'respuesta' esté definido
+    solicitud.documento = documento
+
+    db.commit()
+    
+    return {"message": "Contestación actualizada con éxito"}
 
 
+#Metodo para actualizar comunicados
+@app.put("/comunicados/{id_comunicado}")
+async def editar_comunicado(id_comunicado: int, titulo: str = None, descripcion: str = None, foto: str = None, db: Session = Depends(get_db)):
+    comunicado = db.query(Comunicado).filter(Comunicado.id_comunicado == id_comunicado).first()
+    
+    if not comunicado:
+        raise HTTPException(status_code=404, detail="Comunicado no encontrado.")
+    
+    if titulo is not None:
+        comunicado.titulo = titulo
+    if descripcion is not None:
+        comunicado.descripcion = descripcion
+    if foto is not None:
+        comunicado.foto = foto
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    db.commit()
+    return comunicado

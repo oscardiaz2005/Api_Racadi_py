@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, Enum, Date, Time, ForeignKey, event, delete
+from sqlalchemy import Column, Integer, String, Float, Boolean, Enum, Date, Time, ForeignKey, event, delete, Identity
 from sqlalchemy.orm import relationship, backref
 from conexion import base
 from sqlalchemy.sql import func
@@ -124,11 +124,16 @@ class Plan(base):
 
 class Cuenta(base):
     __tablename__ = 'cuentas'
+    pagare= Column(Integer, autoincrement=True , nullable=True)
     documento = Column(String(15), ForeignKey('estudiantes.documento', ondelete='CASCADE'), primary_key=True)
     saldo = Column(Integer, nullable=False)
     pago_minimo = Column(Integer, nullable=False)
     fecha_proximo_pago = Column(Date, nullable=False)
-    dias_mora = Column(Integer)
+
+    dias_mora = Column(Integer, default=0)
+
+    dias_mora = Column(Integer,default=0)
+
 
     
 

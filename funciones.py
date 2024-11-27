@@ -18,9 +18,13 @@ MINUTOS_DE_EXPIRACION = 30
 
 ## Encriptacion de contraseñas
 encriptacion = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
 # Función para verificar la contraseña
 def verificar_contraseña_login(contraseña, hashed_contraseña):
-    return encriptacion.verify(contraseña, hashed_contraseña)
+    return encriptacion.verify(contraseña, hashed_contraseña) 
+
+    
 # Función para obtener el hash de una contraseña
 def encriptar_contraseña(password):
     return encriptacion.hash(password)
