@@ -945,7 +945,7 @@ async def filtro_observaciones_por_documento(documento: str, db: Session = Depen
         observaciones = (
             db.query(Observacion)
             .filter(Observacion.documento == documento)
-            .order_by(desc(Observacion.fecha))  # Ordenar por fecha de creación descendente
+            .order_by(desc(Observacion.id_observacion))  # Ordenar por fecha de creación descendente
             .all()
         )
 
@@ -962,7 +962,7 @@ async def filtro_observaciones_por_documento(documento: str, db: Session = Depen
 async def filtro_observaciones_por_documento(documento: str,fecha:str, db: Session = Depends(get_db)):
     try:
         # Realiza la consulta a la base de datos para filtrar por documento
-        observaciones = db.query(Observacion).filter(Observacion.documento == documento) and db.query(Observacion).filter(Observacion.fecha == fecha).order_by(desc(Observacion.fecha)).all()
+        observaciones = db.query(Observacion).filter(Observacion.documento == documento) and db.query(Observacion).filter(Observacion.fecha == fecha).order_by(desc(Observacion.id_observacion)).all()
         return observaciones
     except SQLAlchemyError as e:
         # Si hay un error en la consulta, se lanza una excepción con el mensaje de error
@@ -1182,7 +1182,7 @@ async def getStudentsNotes(nivel: str,documento:str, db: Session = Depends(get_d
 @app.get("/getStudentpayments/{documento}")
 async def getStudentspayments(documento:str,db:Session = Depends(get_db)):
     try:
-        pagos_encontradas=db.query(Pago).filter(Pago.cuenta_documento==documento).order_by(desc(Pago.fecha)).all()
+        pagos_encontradas=db.query(Pago).filter(Pago.cuenta_documento==documento).order_by(desc(Pago.id_pago)).all()
         if pagos_encontradas:
             return pagos_encontradas
         else:

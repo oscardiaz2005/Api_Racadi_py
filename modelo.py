@@ -53,7 +53,7 @@ class Estudiante(base):
 class Nivel(base):
     __tablename__ = 'niveles'
     nombre_nivel = Column(String(30), primary_key=True, nullable=False)
-    descripcion_nivel = Column(String(300), primary_key=True, nullable=False)
+    descripcion_nivel = Column(String(300), nullable=False)
 
 
 class RegistroEstudianteNivel(base):
