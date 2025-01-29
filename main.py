@@ -959,10 +959,20 @@ async def filtro_observaciones_por_documento(documento: str, db: Session = Depen
     
 #Es para mostrar las observaciones del estudiante en la vista estudiante filtrados por fecha
 @app.get("/filtro_ObservadoresFecha/{documento}/{fecha}")
-async def filtro_observaciones_por_documento(documento: str,fecha:str, db: Session = Depends(get_db)):
+async def filtro_observaciones_por_documento(documento: str, fecha: str, db: Session = Depends(get_db)):
     try:
-        # Realiza la consulta a la base de datos para filtrar por documento
-        observaciones = db.query(Observacion).filter(Observacion.documento == documento) and db.query(Observacion).filter(Observacion.fecha == fecha).order_by(desc(Observacion.id_observacion)).all()
+        # Realiza la consulta a la base de datos filtrando por documento y fecha
+        observaciones = (
+            db.query(Observacion)
+            .filter(
+                and_(
+                    Observacion.documento == documento,
+                    Observacion.fecha == fecha
+                )
+            )
+            .order_by(desc(Observacion.id_observacion))
+            .all()
+        )
         return observaciones
     except SQLAlchemyError as e:
         # Si hay un error en la consulta, se lanza una excepción con el mensaje de error
