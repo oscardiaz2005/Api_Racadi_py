@@ -1,6 +1,6 @@
-from modelo import *
+from db.modelo import *
 from sqlalchemy.orm import Session 
-from schemas import *
+from db.schemas import *
 #si no les agarra descarguen esto 'pip install fastapi uvicorn python-jose[cryptography] passlib'
 from jose import jwt
 from datetime import datetime,timedelta
