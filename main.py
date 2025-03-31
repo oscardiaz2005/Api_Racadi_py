@@ -1,6 +1,8 @@
 import os
 from fastapi import FastAPI ,HTTPException,Depends,status ,Form ,File ,UploadFile
 from fastapi.staticfiles import StaticFiles
+#importaciones para las fotos
+
 from conexion import crear,get_db
 from modelo import *
 from sqlalchemy.orm import Session 
@@ -23,13 +25,13 @@ from fastapi import FastAPI, APIRouter
 
 #inicializar la app
 app=FastAPI()
-<<<<<<< HEAD
+
 
 app.mount("/images", StaticFiles(directory="micarpetaimg"), name="images")
 
-=======
+
 router = APIRouter()
->>>>>>> sebas
+
 
 #PERMITIR EL USO DE LA API
 app.add_middleware(
