@@ -1,11 +1,13 @@
-from modelo import *
+from db.modelo import *
 from sqlalchemy.orm import Session 
-from schemas import *
+from db.schemas import *
 #si no les agarra descarguen esto 'pip install fastapi uvicorn python-jose[cryptography] passlib'
 from jose import jwt
 from datetime import datetime,timedelta
 from passlib.context import CryptContext
 from fastapi import HTTPException
+from sqlalchemy import or_ , and_
+
 
 
 
@@ -138,3 +140,88 @@ def crear_token(datos: dict, tiempo_expiracion: timedelta = None):
 def get_name_teacher_by_dni(documento:str , db:Session):
     P=db.query(Profesor).filter(Profesor.documento==documento).first()
     return f"{P.nombre} {P.apellido}"
+
+#OBTENER NOMBRE Y APELIIDO DE ESTUDIANTE POR DOCUMENTO 
+def get_name_student_by_dni(documento:str , db:Session):
+    S=db.query(Estudiante).filter(Estudiante.documento==documento).first()
+    return f"{S.nombre} {S.apellido}"
+
+ 
+#FUNCION PARA CONTAR CUANTOS ESTUDIANTES HAN RESERVADO UNA CLASE
+def count_students(id_clase:int , db :Session):
+    students=db.query(Reserva).filter(id_clase==Reserva.id_clase).all()
+    return len(students)
+
+
+#Funcion para validar las notas 
+def verify_notes(speaking:float,listening:float,reading:float,writing:float):
+    if speaking>5.0 or speaking<0.0 or listening>5.0 or listening<0.0 or writing>5.0 or writing<0.0 or reading>5.0 or reading<0.0:
+        raise HTTPException (status_code=400, detail="las notas no pueden ser inferiores a 0.0 o supriores a 5.0")    
+
+
+def validar_estudiante(documento:str , db :Session) :
+    exist=db.query(Estudiante).filter(documento == Estudiante.documento).first()
+    if not exist:
+        raise HTTPException(status_code=400, detail="El documento no coincide con ninguno de nuestros estudiantes.")
+    
+def validar_nivel_estudiante(documento:str , db :Session) :
+    estudiante=db.query(Estudiante).filter(documento == Estudiante.documento).first()
+    if estudiante.nivel_actual=="advanced":
+        raise HTTPException(status_code=400, detail="El documento coincide con un estudiante que se encuentra en el ultimo nivel de apredizaje.")
+ 
+def get_student_level(documento:str , db :Session):
+    estudiante=db.query(Estudiante).filter(Estudiante.documento==documento).first()
+    return estudiante.nivel_actual
+
+
+def borrar_registro_fallido(documento:str,nivel:str,db=Session):
+    existe_registro_fallido=db.query(RegistroEstudianteNivel).filter( and_(documento==RegistroEstudianteNivel.documento,nivel==RegistroEstudianteNivel.nivel )  ).first()
+    if existe_registro_fallido:
+        db.delete(existe_registro_fallido)
+        db.commit()
+
+
+
+
+def set_next_level(documento:str,db:Session):
+    estudiante=db.query(Estudiante).filter(documento == Estudiante.documento).first()
+    nivel_actual=estudiante.nivel_actual
+    registro_de_nivel=db.query(RegistroEstudianteNivel).filter( and_(documento==RegistroEstudianteNivel.documento,nivel_actual==RegistroEstudianteNivel.nivel )  ).first()
+    if registro_de_nivel.aprobacion==True:
+        if estudiante.nivel_actual=="beginner":
+            estudiante.nivel_actual="basic 1"
+        elif estudiante.nivel_actual=="basic 1":
+            estudiante.nivel_actual="basic 2"
+        elif estudiante.nivel_actual=="basic 2":
+            estudiante.nivel_actual="intermediate"    
+        elif estudiante.nivel_actual=="intermediate":
+            estudiante.nivel_actual="advanced"  
+    db.commit()
+    db.refresh(estudiante)
+    
+
+def make_quiz_observation(documento:str,db:Session):
+    observation=""
+    estudiante=db.query(Estudiante).filter(documento == Estudiante.documento).first()
+    nivel_actual=estudiante.nivel_actual
+    registro_de_nivel=db.query(RegistroEstudianteNivel).filter( and_(documento==RegistroEstudianteNivel.documento,nivel_actual==RegistroEstudianteNivel.nivel )  ).first()
+    if registro_de_nivel.aprobacion==True:
+        observation="son los requeridos para ser promovido"
+    else :
+        observation="no son los requeridos para ser promovido"
+
+    nueva_observacion = Observacion(
+        descripcion=f"El estudiante {estudiante.nombre} {estudiante.apellido} presenta examen de cambio de nivel, los resultados {observation}",
+        documento=estudiante.documento,
+        creada_por="Administracion" ) 
+    db.add(nueva_observacion)
+    db.commit()
+    db.refresh(nueva_observacion)   
+
+
+
+
+    
+
+
+
