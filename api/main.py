@@ -1,13 +1,15 @@
 import os
 from fastapi import FastAPI ,HTTPException,Depends,status ,Form ,File ,UploadFile
 from fastapi.staticfiles import StaticFiles
+#importaciones para las fotos
+
 from core.conexion import crear,get_db
 from db.modelo import *
 from sqlalchemy.orm import Session 
 from fastapi.middleware.cors import CORSMiddleware
 from db.schemas import *
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import text , or_ , and_ ,desc,asc
+from sqlalchemy import text , or_ , and_
 #si no les agarra descarguen esto 'pip install fastapi uvicorn python-jose[cryptography] passlib'
 from jose import JWTError,jwt
 from datetime import datetime,timedelta
@@ -968,7 +970,6 @@ async def filtro_observaciones_por_documento(documento: str, db: Session = Depen
     except SQLAlchemyError as e:
         # Si hay un error en la consulta, se lanza una excepción con el mensaje de error
         raise HTTPException(status_code=400, detail=str(e))
-
     
     
 #Es para mostrar las observaciones del estudiante en la vista estudiante filtrados por fecha
