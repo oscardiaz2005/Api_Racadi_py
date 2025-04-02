@@ -968,10 +968,6 @@ async def filtro_observaciones_por_documento(documento: str, db: Session = Depen
     except SQLAlchemyError as e:
         # Si hay un error en la consulta, se lanza una excepción con el mensaje de error
         raise HTTPException(status_code=400, detail=str(e))
-<<<<<<< HEAD
-=======
-
->>>>>>> fd20962cf118496bd230bf1f607e61767fb784be
     
     
 #Es para mostrar las observaciones del estudiante en la vista estudiante filtrados por fecha
