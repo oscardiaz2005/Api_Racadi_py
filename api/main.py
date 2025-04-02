@@ -7,7 +7,11 @@ from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 from db.schemas import *
 from sqlalchemy.exc import SQLAlchemyError
+<<<<<<< HEAD
 from sqlalchemy import text , or_ , and_ ,desc,asc
+=======
+from sqlalchemy import asc, desc, text , or_ , and_
+>>>>>>> fb42b5f440010598443b0d28fb89db3cd2a0179f
 #si no les agarra descarguen esto 'pip install fastapi uvicorn python-jose[cryptography] passlib'
 from jose import JWTError,jwt
 from datetime import datetime,timedelta
@@ -968,7 +972,10 @@ async def filtro_observaciones_por_documento(documento: str, db: Session = Depen
     except SQLAlchemyError as e:
         # Si hay un error en la consulta, se lanza una excepción con el mensaje de error
         raise HTTPException(status_code=400, detail=str(e))
+<<<<<<< HEAD
 
+=======
+>>>>>>> fb42b5f440010598443b0d28fb89db3cd2a0179f
     
     
 #Es para mostrar las observaciones del estudiante en la vista estudiante filtrados por fecha
@@ -1532,4 +1539,8 @@ async def activar_estudiante(documento:str,db:Session=Depends(get_db)):
         db.refresh(profesor_encontrado)
         return f"profesor con documento {documento} habilitado"
     else:
+<<<<<<< HEAD
         raise HTTPException (status_code=400, detail="no se encontro profesor") 
+=======
+        raise HTTPException (status_code=400, detail="no se encontro profesor")    
+>>>>>>> fb42b5f440010598443b0d28fb89db3cd2a0179f
