@@ -20,5 +20,5 @@ def get_db():
     conex=SessionLocal()
     try:
         yield conex
-    finally:
+    finally: 
         conex.close()

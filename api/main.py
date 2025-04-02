@@ -1,8 +1,6 @@
 import os
 from fastapi import FastAPI ,HTTPException,Depends,status ,Form ,File ,UploadFile
 from fastapi.staticfiles import StaticFiles
-#importaciones para las fotos
-
 from core.conexion import crear,get_db
 from db.modelo import *
 from sqlalchemy.orm import Session 
@@ -91,7 +89,7 @@ async def login(datos_login: LoginBase, db: Session = Depends(get_db)):
             "usuario": usuario.usuario
             }
 
-     # Generar el token JWT 
+    # Generar el token JWT 
     token_acceso = crear_token(datos=datos_token, tiempo_expiracion=timedelta(minutes=MINUTOS_DE_EXPIRACION))
     return {"access_token": token_acceso, "token_type": "bearer"}
 
@@ -162,7 +160,7 @@ async def read_users_me(current_user: dict = Depends(get_current_user)):
                 "estado":current_user.estado
         }   
     elif current_user.__class__.__name__.lower()=="profesor":
-   
+
         return{  "rol": "profesor",
                 "documento" : current_user.documento ,
                 "tipo_de_documento" : current_user.tipo_de_documento, 
@@ -179,7 +177,7 @@ async def read_users_me(current_user: dict = Depends(get_current_user)):
                 "foto_perfil": current_user.foto_perfil,
                 "estado":current_user.estado
         }          
- 
+
 
 
 #-------------------------------------------------------------------------------------------------------------------------            
@@ -202,7 +200,7 @@ async def add_admin(datos_administador:AdministradorBase , db: Session =Depends(
         raise HTTPException (status_code=400, detail=f"el id de administrador '{datos_administador.administrador_id}' ya esta en uso ")       
     if usuario_existe_globalmente(datos_administador.usuario, db):
         raise HTTPException(status_code=400, detail=f"El usuario '{datos_administador.usuario}' ya está en uso ")
- 
+
     #SE VERIFICA SI LA CONTRASEÑA ES VALIDA
     if not verificar_contraseña(datos_administador.contraseña):
         raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres , incluyendo números , caracteres especiales y  mayusculas")
@@ -503,7 +501,7 @@ async def reservar_clase(datos_reserva: ReservaBase, db: Session = Depends(get_d
     
     existe_reserva = db.query(Reserva).filter(
         and_(Reserva.id_clase == datos_reserva.id_clase,
-             Reserva.documento_estudiante == datos_reserva.documento_estudiante)
+            Reserva.documento_estudiante == datos_reserva.documento_estudiante)
     ).first()
     if existe_reserva:
         raise HTTPException(status_code=400, detail="Clase ya reservada")
@@ -571,11 +569,11 @@ async def reservar_clase(datos_reserva: ReservaBase, db: Session = Depends(get_d
 async def añadir_observacion(datos_observacion:ObservacionBase , db:Session=Depends(get_db)):
     
     try:
-          nueva_observacion=Observacion(descripcion=datos_observacion.descripcion,documento=datos_observacion.documento,creada_por=datos_observacion.creada_por)
-          db.add(nueva_observacion) 
-          db.commit()
-          db.refresh(nueva_observacion)
-          return f"Observacion fue agregada"
+        nueva_observacion=Observacion(descripcion=datos_observacion.descripcion,documento=datos_observacion.documento,creada_por=datos_observacion.creada_por)
+        db.add(nueva_observacion) 
+        db.commit()
+        db.refresh(nueva_observacion)
+        return f"Observacion fue agregada"
     except SQLAlchemyError as e:
         db.rollback()
         raise HTTPException(status_code=400 ,detail=f"algo salio mal : {str(e)}")
@@ -662,7 +660,7 @@ async def add_quiz_results(documento:str,speaking:float,listening:float,reading:
         raise HTTPException(status_code=400 ,detail=f"algo salio mal : {str(e)}")
     make_quiz_observation(documento,db)
     set_next_level(documento,db)   
-      
+    
     
 
 
@@ -674,7 +672,7 @@ async def asistencia(id_reserva:int , db:Session=Depends(get_db) ) :
         id_reserva=id_reserva,
         asistencia=True
     )
-      
+    
     try: 
         db.add(asistencia)
         db.commit()
@@ -689,7 +687,7 @@ async def incumplimiento(id_reserva:int , db:Session=Depends(get_db) ) :
         id_reserva=id_reserva,
         asistencia=False
     )
-      
+    
     try: 
         db.add(asistencia)
         db.commit()
@@ -728,7 +726,7 @@ async def agregar_pagos(cuenta_documento:str,valor:int , db:Session=Depends(get_
         raise HTTPException(status_code=400 ,detail=f"algo salio mal : {str(e)}")
         
 
-           
+        
     
 
 
@@ -970,6 +968,10 @@ async def filtro_observaciones_por_documento(documento: str, db: Session = Depen
     except SQLAlchemyError as e:
         # Si hay un error en la consulta, se lanza una excepción con el mensaje de error
         raise HTTPException(status_code=400, detail=str(e))
+<<<<<<< HEAD
+=======
+
+>>>>>>> fd20962cf118496bd230bf1f607e61767fb784be
     
     
 #Es para mostrar las observaciones del estudiante en la vista estudiante filtrados por fecha
@@ -1151,7 +1153,7 @@ async def filtro_Clases_por_documento(documento: str, db: Session = Depends(get_
     except SQLAlchemyError as e:
         # Si hay un error en la consulta, se lanza una excepción con el mensaje de error
         raise HTTPException(status_code=400, detail=str(e))
-         
+        
 
 #METODO PARA OBTENER TODOS LOS ESTUDIANTES DE UNA CLASE / ASISTENCIA
 
@@ -1267,7 +1269,7 @@ async def cancelar_reserva(datos_reserva: ReservaBase, db: Session = Depends(get
     # Buscar la reserva
     reserva = db.query(Reserva).filter(
         and_(Reserva.id_clase == datos_reserva.id_clase,
-             Reserva.documento_estudiante == datos_reserva.documento_estudiante)
+            Reserva.documento_estudiante == datos_reserva.documento_estudiante)
     ).first()
     
     if reserva is None:
@@ -1509,7 +1511,7 @@ async def delete_estudiante(documento:str,db:Session=Depends(get_db)):
     
 
 
-#METODO PARA DESACTIVAR LA CUENTA UN ESTUDIANTE
+#METODO PARA ACTIVAR LA CUENTA UN ESTUDIANTE
 @app.put("/activarestudiante/{documento}")
 async def activar_estudiante(documento:str,db:Session=Depends(get_db)):
     estudiante_encontrado=db.query(Estudiante).filter(documento==Estudiante.documento).first()
@@ -1523,7 +1525,7 @@ async def activar_estudiante(documento:str,db:Session=Depends(get_db)):
 
 
 
-#METODO PARA DESACTIVAR LA CUENTA DE UN PROFESOR
+#METODO PARA ACTIVAR LA CUENTA DE UN PROFESOR
 @app.put("/activarprofesor/{documento}")
 async def activar_estudiante(documento:str,db:Session=Depends(get_db)):
     profesor_encontrado=db.query(Profesor).filter(documento==Profesor.documento).first()
