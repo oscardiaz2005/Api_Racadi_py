@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 from db.schemas import *
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import text , or_ , and_
+from sqlalchemy import asc, desc, text , or_ , and_
 #si no les agarra descarguen esto 'pip install fastapi uvicorn python-jose[cryptography] passlib'
 from jose import JWTError,jwt
 from datetime import datetime,timedelta
