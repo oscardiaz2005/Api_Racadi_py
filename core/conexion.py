@@ -7,7 +7,7 @@ from sqlalchemy.orm import sessionmaker
 
 
 #URL_DB="mysql+mysqlconnector://root:osjdiaz123@localhost:3306/racadi_academy"
-URL_DB="mysql+mysqlconnector://db_admin:admin_adso*@localhost:3306/racadi_academy"
+URL_DB="mysql+mysqlconnector://db_admin:admin_adso*@localhost:3366/racadi_academy"
 
 crear=create_engine(URL_DB)
 SessionLocal=sessionmaker(autocommit=False,autoflush=False, bind=crear)
