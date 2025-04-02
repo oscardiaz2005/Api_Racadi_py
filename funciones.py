@@ -133,11 +133,6 @@ def crear_token(datos: dict, tiempo_expiracion: timedelta = None):
     return jwt_token
 
 
-#OBTENER DATOS DE LA CUENTA
-def obtener_datos_cuenta(documento:str, db:Session):
-    #Verifica si la cuenta esta creada o no
-    cuenta = db.query(Cuenta).filter(Cuenta.documento == documento).first()
-    return cuenta
 
 #OBTENER NOMBRE Y APELIIDO DE PROFESOR POR DOCUMENTO 
 def get_name_teacher_by_dni(documento:str , db:Session):

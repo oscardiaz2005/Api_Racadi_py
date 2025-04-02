@@ -596,7 +596,6 @@ async def get_estudiantes(db: Session = Depends(get_db)):
     try:
         estudiantes = db.query(Estudiante).all()  # Obtener  todos los estudiantes
         return estudiantes  # retornar los estudiantes,claramente no?
-
     except SQLAlchemyError as e:
         raise HTTPException(status_code=400, detail=str(e))
     
@@ -653,6 +652,8 @@ async def buscar_profesores(nombre: str, db: Session = Depends(get_db)):
     
     return resultados
 
+
+##METODO YA REALIZADO EN JAVA
 ## METODO PARA CONSULTAR EL NOMBRE DE LOS PLANES
 @app.get("/obtenernombreplanes")
 async def obtener_nombre_planes (db:Session=Depends(get_db)):
@@ -665,6 +666,8 @@ async def obtener_nombre_planes (db:Session=Depends(get_db)):
     
 
 
+
+##METODO YA REALIZADO EN JAVA
 ## METODO PARA CONSULTAR EL NOMBRE DE LOS NIVELES
 @app.get("/obtenernombreniveles")
 async def obtener_nombre_nivels (db:Session=Depends(get_db)):
