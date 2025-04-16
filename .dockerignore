@@ -1,0 +1,7 @@
+_pychache_/
+*.pyc
+*.pyo
+*.pyd
+.cache/
+*.log
+*.tmp
