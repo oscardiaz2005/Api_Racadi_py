@@ -1036,7 +1036,7 @@ async def obtener_solicitudes_estudiante(documento: str, db: Session = Depends(g
         if resultados:
             return resultados
         else:
-            return None
+            return []
 
     except SQLAlchemyError as e:
         raise HTTPException(status_code=400, detail=str(e)) 
