@@ -17,7 +17,8 @@ from services.funciones_crear_cuenta import *
 from services.funciones_validacion_clases import *
 from typing import List
 from sqlalchemy.orm import joinedload
-
+import cloudinary
+import cloudinary.uploader
 
 
 # DOCUMENTEN EL CODIGO (COMENTAR) PARA QUE NO SE HAGA UN SANCOCHO XFA
@@ -26,7 +27,12 @@ from sqlalchemy.orm import joinedload
 #inicializar la app
 app=FastAPI()
 
-app.mount("/images", StaticFiles(directory="static/micarpetaimg"), name="images")
+cloudinary.config(
+    cloud_name="dlvbdulhu",
+    api_key="779863167173264",
+    api_secret="oAVnHcPQYE4ROdKpItLSSOi8MSQ"
+)
+
 
 
 #PERMITIR EL USO DE LA API
@@ -256,24 +262,28 @@ async def añadir_estudiante(
         raise HTTPException(status_code=400, detail="Número de celular inválido, debe tener 10 dígitos.")
 
     
+    foto_perfil_url = None
     if file:
         if file.content_type not in ["image/jpeg", "image/png"]:
             raise HTTPException(status_code=400, detail="Formato de archivo no soportado")
-        
-        folder_path = "static/micarpetaimg"
-        file_location = os.path.join(folder_path, file.filename)
 
-        # Asegúrate de que la carpeta existe
-        os.makedirs(folder_path, exist_ok=True)
+        # Formar el nombre con fecha y hora
+        now = datetime.now()
+        timestamp = now.strftime("%Y%m%d_%H%M%S")
+        extension = file.filename.split(".")[-1]
+        filename = f"prof_{timestamp}.{extension}"
 
-        # Guarda el archivo en el servidor
-        with open(file_location, "wb") as buffer:
-            buffer.write(await file.read())
-
-
-        foto_perfil_url = f"/images/{file.filename}"
-    else :
-        foto_perfil_url=None   
+        try:
+            result = cloudinary.uploader.upload(
+                file.file,
+                folder="miapp_imgs",
+                public_id=filename,
+                overwrite=True,
+                resource_type="image"
+            )
+            foto_perfil_url = result["secure_url"]
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error subiendo imagen: {str(e)}") 
 
     
     # Crea el nuevo estudiante
@@ -350,25 +360,28 @@ async def añadir_estudiante(
     if not verify_cel(celular):
         raise HTTPException(status_code=400, detail="Número de celular inválido, debe tener 10 dígitos.")
 
+    foto_perfil_url = None
     if file:
         if file.content_type not in ["image/jpeg", "image/png"]:
             raise HTTPException(status_code=400, detail="Formato de archivo no soportado")
-        
-        folder_path = "static/micarpetaimg"
-        file_location = os.path.join(folder_path, file.filename)
 
-        # Asegúrate de que la carpeta existe
-        os.makedirs(folder_path, exist_ok=True)
+        # Formar el nombre con fecha y hora
+        now = datetime.now()
+        timestamp = now.strftime("%Y%m%d_%H%M%S")
+        extension = file.filename.split(".")[-1]
+        filename = f"prof_{timestamp}.{extension}"
 
-        # Guarda el archivo en el servidor
-        with open(file_location, "wb") as buffer:
-            buffer.write(await file.read())
-
-
-        foto_perfil_url = f"/images/{file.filename}"
-    else :
-        foto_perfil_url=None 
-
+        try:
+            result = cloudinary.uploader.upload(
+                file.file,
+                folder="miapp_imgs",
+                public_id=filename,
+                overwrite=True,
+                resource_type="image"
+            )
+            foto_perfil_url = result["secure_url"]
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error subiendo imagen: {str(e)}")
     
     # Crea el nuevo Profesor
     nuevo_profesor = Profesor(
@@ -600,28 +613,33 @@ async def añadir_solicitud(dato_solicitud:SolicitudBase, db:Session=Depends(get
 async def crear_comunicado(
     titulo: str = Form(...),descripcion: str = Form(...),file: UploadFile = File(...),  db:Session=Depends(get_db)):
 
+    foto_perfil_url = None
+    if file:
+        if file.content_type not in ["image/jpeg", "image/png"]:
+            raise HTTPException(status_code=400, detail="Formato de archivo no soportado")
 
-    if file.content_type not in ["image/jpeg", "image/png"]:
-        raise HTTPException(status_code=400, detail="Formato de archivo no soportado")
-    
-    folder_path = "static/micarpetaimg"
-    file_location = os.path.join(folder_path, file.filename)
+        # Formar el nombre con fecha y hora
+        now = datetime.now()
+        timestamp = now.strftime("%Y%m%d_%H%M%S")
+        extension = file.filename.split(".")[-1]
+        filename = f"prof_{timestamp}.{extension}"
 
-    # Asegúrate de que la carpeta existe
-    os.makedirs(folder_path, exist_ok=True)
-
-    # Guarda el archivo en el servidor
-    with open(file_location, "wb") as buffer:
-        buffer.write(await file.read())
-
-
-    ahora = datetime.now().strftime("%Y%m%d_%H%M%S")
-    foto_comunicado_url = f"/images/{ahora}_{file.filename}"
+        try:
+            result = cloudinary.uploader.upload(
+                file.file,
+                folder="miapp_imgs",
+                public_id=filename,
+                overwrite=True,
+                resource_type="image"
+            )
+            foto_perfil_url = result["secure_url"]
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error subiendo imagen: {str(e)}")
 
     nuevo_comunicado=Comunicado(
         titulo=titulo,
         descripcion=descripcion,
-        foto=foto_comunicado_url
+        foto=foto_perfil_url
     )
     try:
         db.add(nuevo_comunicado)
@@ -1340,32 +1358,53 @@ async def actualizar_estudiante(
     file: UploadFile = File(None),  
     db: Session = Depends(get_db)
 ):
+    # Verificar si el estudiante existe
     estudiante_existente = db.query(Estudiante).filter(Estudiante.documento == documento).first()
     
     if not estudiante_existente:
         raise HTTPException(status_code=404, detail="Estudiante no encontrado")
     
-    if usuario != estudiante_existente.usuario:  # Solo verificar si el usuario ha cambiado
+    # Verificar si el usuario ha cambiado y si ya existe
+    if usuario != estudiante_existente.usuario:
         if usuario_existe_globalmente(usuario, db):
             raise HTTPException(status_code=400, detail=f"El usuario '{usuario}' ya está en uso.")
     
+    # Validar el celular
     if not verify_cel(celular):
         raise HTTPException(status_code=400, detail="Número de celular inválido, debe tener 10 dígitos.")
-    
+
+    # Validar la contraseña si es diferente
+    if contraseña != estudiante_existente.contraseña:
+        if not verificar_contraseña(contraseña):
+            raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres, incluyendo números, caracteres especiales y mayúsculas.")
+        estudiante_existente.contraseña = encriptar_contraseña(contraseña)  # Encriptar solo si se cambió
+
+    # Subir nueva foto si se proporcionó
     if file:
         if file.content_type not in ["image/jpeg", "image/png"]:
             raise HTTPException(status_code=400, detail="Formato de archivo no soportado")
-        
-        folder_path = "static/micarpetaimg"
-        file_location = os.path.join(folder_path, file.filename)
 
-        os.makedirs(folder_path, exist_ok=True)
+        # Formar el nombre con fecha y hora
+        now = datetime.now()
+        timestamp = now.strftime("%Y%m%d_%H%M%S")
+        extension = file.filename.split(".")[-1]
+        filename = f"estudiante_{timestamp}.{extension}"
 
-        with open(file_location, "wb") as buffer:
-            buffer.write(await file.read())
-
-        foto_perfil_url = f"/images/{file.filename}"
+        try:
+            # Subir imagen a Cloudinary
+            result = cloudinary.uploader.upload(
+                file.file,
+                folder="estudiantes_perfiles",  # Carpeta específica para perfiles de estudiantes
+                public_id=filename,
+                overwrite=True,
+                resource_type="image"
+            )
+            # Obtener la URL segura
+            foto_perfil_url = result["secure_url"]
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error subiendo imagen a Cloudinary: {str(e)}")
     else:
+        # Mantener la foto actual si no se sube una nueva
         foto_perfil_url = estudiante_existente.foto_perfil  
 
     # Actualizar datos del estudiante
@@ -1383,15 +1422,16 @@ async def actualizar_estudiante(
     if usuario != estudiante_existente.usuario:
         estudiante_existente.usuario = usuario  # Actualizar usuario solo si ha cambiado
 
+    # Actualizar foto de perfil (si se subió una nueva)
+    estudiante_existente.foto_perfil = foto_perfil_url  
+
     # Verificar si la contraseña fue modificada
     if contraseña != estudiante_existente.contraseña:
-        if not verificar_contraseña(contraseña):
-            raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres, incluyendo números, caracteres especiales y mayúsculas.")
         estudiante_existente.contraseña = encriptar_contraseña(contraseña)  # Encriptar solo si se cambió
 
+    # Actualizar otros datos
     estudiante_existente.nivel_actual = nivel_actual
     estudiante_existente.plan = plan
-    estudiante_existente.foto_perfil = foto_perfil_url  
 
     try:
         db.commit()
@@ -1399,6 +1439,7 @@ async def actualizar_estudiante(
     except SQLAlchemyError as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"Algo salió mal: {str(e)}")
+
 
 
 
@@ -1434,18 +1475,28 @@ async def actualizar_profesor(
         raise HTTPException(status_code=400, detail="Número de celular inválido, debe tener 10 dígitos.")
     
     if file:
-        if file.content_type not in ["image/jpeg", "image/png"]:
-            raise HTTPException(status_code=400, detail="Formato de archivo no soportado")
-        
-        folder_path = "static/micarpetaimg"
-        file_location = os.path.join(folder_path, file.filename)
+            if file.content_type not in ["image/jpeg", "image/png"]:
+                raise HTTPException(status_code=400, detail="Formato de archivo no soportado")
 
-        os.makedirs(folder_path, exist_ok=True)
+            # Formar el nombre con fecha y hora
+            now = datetime.now()
+            timestamp = now.strftime("%Y%m%d_%H%M%S")
+            extension = file.filename.split(".")[-1]
+            filename = f"estudiante_{timestamp}.{extension}"
 
-        with open(file_location, "wb") as buffer:
-            buffer.write(await file.read())
-
-        foto_perfil_url = f"/images/{file.filename}"
+            try:
+                # Subir imagen a Cloudinary
+                result = cloudinary.uploader.upload(
+                    file.file,
+                    folder="estudiantes_perfiles",  # Carpeta específica para perfiles de estudiantes
+                    public_id=filename,
+                    overwrite=True,
+                    resource_type="image"
+                )
+                # Obtener la URL segura
+                foto_perfil_url = result["secure_url"]
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Error subiendo imagen a Cloudinary: {str(e)}")
     else:
         foto_perfil_url = profesor_existente.foto_perfil  
 
