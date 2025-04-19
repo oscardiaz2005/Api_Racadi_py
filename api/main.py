@@ -1065,7 +1065,7 @@ async def obtener_solicitudes(db: Session = Depends(get_db)):
         if resultados:
             return resultados
         else:
-            return None
+            return []
 
     except SQLAlchemyError as e:
         raise HTTPException(status_code=400, detail=str(e))         
