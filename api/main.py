@@ -615,7 +615,8 @@ async def crear_comunicado(
         buffer.write(await file.read())
 
 
-    foto_comunicado_url = f"/images/{file.filename}"
+    ahora = datetime.now().strftime("%Y%m%d_%H%M%S")
+    foto_comunicado_url = f"/images/{ahora}_{file.filename}"
 
     nuevo_comunicado=Comunicado(
         titulo=titulo,
@@ -1209,7 +1210,7 @@ async def getStudentspayments(documento:str,db:Session = Depends(get_db)):
         if pagos_encontradas:
             return pagos_encontradas
         else:
-            return None               
+            return []              
     except SQLAlchemyError as e:
         raise HTTPException(status_code=400, detail=str(e))                
 
